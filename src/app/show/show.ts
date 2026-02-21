@@ -103,7 +103,7 @@ export class ShowComponent implements OnInit {
   selectedSeason = 1;
   selectedEpisodeNumber: number | null = null;
 
-  private readonly storageKey = 'continueMovies';
+  private readonly storageKeyShows = 'continueShows';
   savedToContinue = false;
 
   constructor(
@@ -124,6 +124,22 @@ export class ShowComponent implements OnInit {
         this.seasons = s.seasons || [];
         // choose initial season (prefer 1 or the first non-zero season)
         this.selectedSeason = this.seasons.find((ss) => ss.season_number && ss.season_number > 0)?.season_number || 1;
+
+        // if there is saved progress for this show, use it to set season/episode
+        try {
+          const raw = localStorage.getItem(this.storageKeyShows);
+          if (raw) {
+            const entries = JSON.parse(raw) as Array<{ id: number; season?: number | null; episode?: number | null }>;
+            const existing = entries.find((e) => e.id === id);
+            if (existing) {
+              this.savedToContinue = true;
+              if (existing.season) this.selectedSeason = existing.season;
+            }
+          }
+        } catch {
+          // ignore parse errors
+        }
+
         this.loadSeasonEpisodes(s.id, this.selectedSeason);
       },
       error: (err) => console.error(err),
@@ -176,17 +192,22 @@ export class ShowComponent implements OnInit {
   saveToContinue(): void {
     const id = this.show?.id;
     if (!id) return;
-    let ids: number[] = [];
+    let entries: Array<{ id: number; season?: number | null; episode?: number | null }> = [];
     try {
-      ids = JSON.parse(localStorage.getItem(this.storageKey) || '[]') as number[];
+      entries = JSON.parse(localStorage.getItem(this.storageKeyShows) || '[]');
     } catch {
-      ids = [];
+      entries = [];
     }
-    if (!ids.includes(id)) {
-      ids.push(id);
-      localStorage.setItem(this.storageKey, JSON.stringify(ids));
+    const existing = entries.find((e) => e.id === id);
+    const progress = { id, season: this.selectedSeason, episode: this.selectedEpisodeNumber };
+    if (existing) {
+      existing.season = progress.season;
+      existing.episode = progress.episode;
+    } else {
+      entries.push(progress);
     }
+    localStorage.setItem(this.storageKeyShows, JSON.stringify(entries));
     this.savedToContinue = true;
-    window.dispatchEvent(new CustomEvent('continueMoviesUpdated', { detail: { id } }));
+    window.dispatchEvent(new CustomEvent('continueShowsUpdated', { detail: { id, season: this.selectedSeason, episode: this.selectedEpisodeNumber } }));
   }
 }
