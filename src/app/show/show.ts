@@ -29,7 +29,7 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
           frameborder="0"
           allowfullscreen
           class="player-iframe"
-          title="Player for {{ show?.name }}"
+          title="Player for {{ show.name }}"
         ></iframe>
 
         <div
@@ -46,7 +46,7 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
       <div class="season-panel" *ngIf="seasons.length > 0">
         <div class="season-select">
           <label for="season">Season</label>
-          <select id="season" [value]="selectedSeason" (change)="changeSeason($event.target.value)">
+          <select id="season" [value]="selectedSeason" (change)="changeSeason($event)">
             <option *ngFor="let s of seasons" [value]="s.season_number">{{ s.name || ('Season ' + s.season_number) }}</option>
           </select>
         </div>
@@ -104,7 +104,6 @@ export class ShowComponent implements OnInit {
   selectedEpisodeNumber: number | null = null;
 
   private readonly storageKey = 'continueMovies';
-  private readonly storageKeyShows = 'continueShows';
   savedToContinue = false;
 
   constructor(
@@ -117,37 +116,27 @@ export class ShowComponent implements OnInit {
   ngOnInit(): void {
     const id = Number(this.route.snapshot.paramMap.get('id'));
     if (!id) return;
-    const qp = this.route.snapshot.queryParamMap;
-    const qSeason = qp.get('season');
-    const qEpisode = qp.get('episode');
-    const requestedSeason = qSeason ? Number(qSeason) : undefined;
-    const requestedEpisode = qEpisode ? Number(qEpisode) : undefined;
 
     this.tmdb.getTvDetails(id).subscribe({
       next: (s) => {
         this.show = s;
         // populate seasons list from show details
         this.seasons = s.seasons || [];
-        // choose initial season (use requestedSeason if provided, otherwise prefer 1 or the first non-zero season)
-        this.selectedSeason = requestedSeason || this.seasons.find((ss) => ss.season_number && ss.season_number > 0)?.season_number || 1;
-        this.loadSeasonEpisodes(s.id, this.selectedSeason, requestedEpisode);
+        // choose initial season (prefer 1 or the first non-zero season)
+        this.selectedSeason = this.seasons.find((ss) => ss.season_number && ss.season_number > 0)?.season_number || 1;
+        this.loadSeasonEpisodes(s.id, this.selectedSeason);
       },
       error: (err) => console.error(err),
     });
   }
 
-  private loadSeasonEpisodes(seriesId: number, seasonNumber: number, selectEpisodeNumber?: number) {
+  private loadSeasonEpisodes(seriesId: number, seasonNumber: number) {
     this.tmdb.getSeasonDetails(seriesId, seasonNumber).subscribe({
       next: (season) => {
         this.episodes = season.episodes || [];
         // set a default embed to first episode if available
         if (this.episodes.length > 0) {
-          let ep: TmdbEpisode | undefined;
-          if (selectEpisodeNumber) {
-            ep = this.episodes.find((e) => e.episode_number === selectEpisodeNumber) || this.episodes[0];
-          } else {
-            ep = this.episodes[0];
-          }
+          const ep = this.episodes[0];
           this.selectedEpisodeNumber = ep.episode_number;
           const raw = this.vidsrc.getEmbedUrlByTmdbTv(seriesId, seasonNumber, ep.episode_number);
           this.embedUrl = raw ? this.sanitizer.bypassSecurityTrustResourceUrl(raw) : null;
@@ -163,9 +152,16 @@ export class ShowComponent implements OnInit {
     });
   }
 
-  changeSeason(seasonNumber: number) {
+  changeSeason(seasonNumberOrEvent: number | Event) {
     if (!this.show) return;
-    const n = Number(seasonNumber);
+    let n: number;
+    if (typeof seasonNumberOrEvent === 'number') {
+      n = seasonNumberOrEvent;
+    } else {
+      const target = seasonNumberOrEvent.target as HTMLSelectElement | null;
+      if (!target) return;
+      n = Number(target.value);
+    }
     this.selectedSeason = n;
     this.loadSeasonEpisodes(this.show.id, n);
   }
@@ -180,23 +176,17 @@ export class ShowComponent implements OnInit {
   saveToContinue(): void {
     const id = this.show?.id;
     if (!id) return;
-    // persist show progress (id, season, episode) to separate storage
-    let entries: { id: number; season?: number | null; episode?: number | null }[] = [];
+    let ids: number[] = [];
     try {
-      entries = JSON.parse(localStorage.getItem(this.storageKeyShows) || '[]');
+      ids = JSON.parse(localStorage.getItem(this.storageKey) || '[]') as number[];
     } catch {
-      entries = [];
+      ids = [];
     }
-    const existing = entries.find((e) => e.id === id);
-    const progress = { id, season: this.selectedSeason, episode: this.selectedEpisodeNumber };
-    if (existing) {
-      existing.season = progress.season;
-      existing.episode = progress.episode;
-    } else {
-      entries.push(progress);
+    if (!ids.includes(id)) {
+      ids.push(id);
+      localStorage.setItem(this.storageKey, JSON.stringify(ids));
     }
-    localStorage.setItem(this.storageKeyShows, JSON.stringify(entries));
     this.savedToContinue = true;
-    window.dispatchEvent(new CustomEvent('continueShowsUpdated', { detail: { id, season: this.selectedSeason, episode: this.selectedEpisodeNumber } }));
+    window.dispatchEvent(new CustomEvent('continueMoviesUpdated', { detail: { id } }));
   }
 }
