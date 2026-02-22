@@ -4,25 +4,26 @@ import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { TmdbMovie, TmdbTv, TmdbService } from '../services/tmdb.service';
 import { MatCardModule } from '@angular/material/card';
+import { MediaRowDirective } from './media-row.directive';
 import { Router } from '@angular/router';
 
 @Component({
   standalone: true,
   selector: 'app-home',
-  imports: [NgFor, NgIf, SlicePipe, NgStyle, MatCardModule],
+  imports: [NgFor, NgIf, SlicePipe, MatCardModule, MediaRowDirective],
   template: `
-    <section class="movies-section">
+    <section class="media-section">
       <h2>Continue Watching</h2>
       <p *ngIf="isLoading && continueList.length === 0" class="loading">Loading...</p>
       
       <div *ngIf="continueList.length > 0" class="controls">
-        <div class="row-wrapper" (mouseenter)="hoveringContinue = true" (mouseleave)="hoveringContinue = false">
-          <div #continueScrollContainer class="movies-row" tabindex="0" role="list" (scroll)="onScrollContinue()">
-              <mat-card *ngFor="let item of continueList" class="movie-card" role="listitem" tabindex="0" (click)="openPreview(item.media_type, item.id, item)" (keydown.enter)="openPreview(item.media_type, item.id, item)">
-              <img *ngIf="item.poster_path" mat-card-image [src]="'https://image.tmdb.org/t/p/w500' + item.poster_path" [alt]="item.title + ' poster'" class="poster-image" />
-              <mat-card-content class="card-info">
-                <div class="title">{{ item.title }}</div>
-                <div class="meta">
+        <div class="row-container" appMediaRow (mouseenter)="hoveringContinue = true" (mouseleave)="hoveringContinue = false">
+          <div #continueScrollContainer class="media-row" tabindex="0" role="list" (scroll)="onScrollContinue()">
+              <mat-card *ngFor="let item of continueList" class="media-card" role="listitem" tabindex="0" (click)="openPreview(item.media_type, item.id, item)" (keydown.enter)="openPreview(item.media_type, item.id, item)">
+              <img *ngIf="item.poster_path" mat-card-image [src]="'https://image.tmdb.org/t/p/w500' + item.poster_path" [alt]="item.title + ' poster'" class="media-poster" />
+              <mat-card-content class="card-overlay">
+                <div class="media-title">{{ item.title }}</div>
+                <div class="media-meta">
                   <span class="year">{{ item.release_date | slice:0:4 }}</span>
                   <span class="rating"> {{ item.vote_average.toFixed(1) }}</span>
                 </div>
@@ -39,20 +40,21 @@ import { Router } from '@angular/router';
 
         <div *ngIf="!isLoading" class="controls">
           <div
-            class="row-wrapper"
+            class="row-container"
+            appMediaRow
             (mouseenter)="hoveringTv = true"
             (mouseleave)="hoveringTv = false"
           >
             <div
               #tvScrollContainer
-              class="movies-row"
+              class="media-row"
               tabindex="0"
               role="list"
               (scroll)="onScrollTv()"
             >
               <mat-card
                 *ngFor="let show of tvShows"
-                class="movie-card"
+                class="media-card"
                 role="listitem"
                 tabindex="0"
                 (click)="openPreview('tv', show.id, show)"
@@ -63,11 +65,11 @@ import { Router } from '@angular/router';
                   mat-card-image
                   [src]="'https://image.tmdb.org/t/p/w500' + show.poster_path"
                   [alt]="show.name + ' poster'"
-                  class="poster-image"
+                  class="media-poster"
                 />
-                <mat-card-content class="card-info">
-                  <div class="title">{{ show.name }}</div>
-                  <div class="meta">
+                <mat-card-content class="card-overlay">
+                  <div class="media-title">{{ show.name }}</div>
+                  <div class="media-meta">
                     <span class="year">{{ show.first_air_date | slice:0:4 }}</span>
                     <span class="rating"> {{ show.vote_average.toFixed(1) }}</span>
                   </div>
@@ -100,21 +102,22 @@ import { Router } from '@angular/router';
       <p *ngIf="isLoading && continueList.length === 0" class="loading">Loading...</p>
 
       <div *ngIf="!isLoading" class="controls">
-        <div
-          class="row-wrapper"
-          (mouseenter)="hovering = true"
-          (mouseleave)="hovering = false"
-        >
+          <div
+            class="row-container"
+            appMediaRow
+            (mouseenter)="hovering = true"
+            (mouseleave)="hovering = false"
+          >
           <div
             #scrollContainer
-            class="movies-row"
+            class="media-row"
             tabindex="0"
             role="list"
             (scroll)="onScroll()"
           >
             <mat-card
               *ngFor="let movie of movies"
-              class="movie-card"
+              class="media-card"
               role="listitem"
               tabindex="0"
               (click)="openPreview('movie', movie.id, movie)"
@@ -125,12 +128,13 @@ import { Router } from '@angular/router';
                 mat-card-image
                 [src]="'https://image.tmdb.org/t/p/w500' + movie.poster_path"
                 [alt]="movie.title + ' poster'"
-                class="poster-image"
+                class="media-poster"
               />
-              <mat-card-content class="card-info">
-                <div class="title">{{ movie.title }}</div>
-                <div class="meta">
+              <mat-card-content class="card-overlay">
+                <div class="media-title">{{ movie.title }}</div>
+                <div class="media-meta">
                   <span class="year">{{ movie.release_date | slice:0:4 }}</span>
+                  <span style="font-size: 1.75rem;" >•</span>
                   <span class="rating"> {{ movie.vote_average.toFixed(1) }}</span>
                 </div>
               </mat-card-content>
@@ -160,21 +164,22 @@ import { Router } from '@angular/router';
       <h2 style="margin-top:1.25rem;">Popular Movies</h2>
 
       <div *ngIf="!isLoading" class="controls">
-        <div
-          class="row-wrapper"
-          (mouseenter)="hoveringPopular = true"
-          (mouseleave)="hoveringPopular = false"
-        >
+          <div
+            class="row-container"
+            appMediaRow
+            (mouseenter)="hoveringPopular = true"
+            (mouseleave)="hoveringPopular = false"
+          >
           <div
             #popularScrollContainer
-            class="movies-row"
+            class="media-row"
             tabindex="0"
             role="list"
             (scroll)="onScrollPopular()"
           >
             <mat-card
               *ngFor="let movie of moviesPopular"
-              class="movie-card"
+              class="media-card"
               role="listitem"
               tabindex="0"
               (click)="openPreview('movie', movie.id, movie)"
@@ -185,11 +190,11 @@ import { Router } from '@angular/router';
                 mat-card-image
                 [src]="'https://image.tmdb.org/t/p/w500' + movie.poster_path"
                 [alt]="movie.title + ' poster'"
-                class="poster-image"
+                class="media-poster"
               />
-              <mat-card-content class="card-info">
-                <div class="title">{{ movie.title }}</div>
-                <div class="meta">
+              <mat-card-content class="card-overlay">
+                <div class="media-title">{{ movie.title }}</div>
+                <div class="media-meta">
                   <span class="year">{{ movie.release_date | slice:0:4 }}</span>
                   <span class="rating"> {{ movie.vote_average.toFixed(1) }}</span>
                 </div>
@@ -223,19 +228,17 @@ import { Router } from '@angular/router';
       <div class="preview-sheet" [class.open]="previewOpen" role="dialog" aria-modal="true" [attr.aria-hidden]="!previewOpen">
         <div class="preview-banner">
           <img *ngIf="previewData?.backdrop_path" class="banner-img" [src]="'https://image.tmdb.org/t/p/original' + previewData.backdrop_path" alt="backdrop" />
-          <div *ngIf="previewData?.logo_path" class="banner-logo">
-            <img [src]="'https://image.tmdb.org/t/p/w500' + previewData.logo_path" alt="logo" />
+          <div class="banner-logo">
+            <img *ngIf="previewData?.logo_path" [src]="'https://image.tmdb.org/t/p/w500' + previewData.logo_path" alt="logo" />
+            <div class="banner-meta" *ngIf="previewData">
+              <span *ngIf="previewData?.release_date" class="meta-pill">{{ previewData.release_date | slice:0:4 }}</span>
+              <span *ngIf="previewData?.vote_average !== undefined" class="meta-pill">★ {{ previewData.vote_average?.toFixed(1) }}</span>
+              <span *ngIf="previewData?.genres?.length" class="meta-pill">{{ previewData.genres.join(', ') }}</span>
+            </div>
           </div>
         </div>
         <div class="preview-body">
-          <div class="preview-info">
-            <div style="font-size:1.25rem; font-weight:700">{{ previewData?.title }}</div>
-            <div class="preview-meta">
-              <span *ngIf="previewData?.release_date">{{ previewData.release_date | slice:0:4 }}</span>
-              <span style="margin-left:8px">•</span>
-              <span style="margin-left:8px">{{ previewData?.vote_average?.toFixed(1) }}</span>
-              <span *ngIf="previewData?.genres?.length" style="margin-left:12px">• {{ previewData.genres.join(', ') }}</span>
-            </div>
+            <div class="preview-info">
             <div class="preview-actions">
               <button (click)="playFromPreview()">Play</button>
               <button (click)="closePreview()">Close</button>
@@ -249,63 +252,77 @@ import { Router } from '@angular/router';
   `,
   styles: [
     `
+      /* Host / global */
       :host {
         display: block;
-        min-height: 100vh;
-        background: #1f2937;
+        font-family: 'Roboto', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       }
 
-      .movies-section {
-        padding: 1rem 1.25rem;
+      /* Section + headings */
+      .media-section { padding: 1rem 1.25rem; }
+      h2 { color: #ffffff; margin: 0 0 0.75rem 0;font-family: 'Doto', 'Roboto', system-ui, sans-serif; font-weight: 800; padding: 0 08vw; box-sizing: border-box; }
+      .loading { color: #6b7280; margin: 1rem 0; padding: 0 08vw; box-sizing: border-box; }
+
+      /* Controls wrapper */
+      .controls { display: block; }
+      .row-container { position: relative; padding: 0 08vw; box-sizing: border-box; z-index: 0; }
+
+      /* Left/right fade overlays to visually blend scroll edges into background (toggle via classes) */
+      .row-container::before,
+      .row-container::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 3vw;
+        pointer-events: none;
+        z-index: 29; /* keep below scroll buttons (z-index:30) */
+        opacity: 0;
+        transition: opacity 200ms ease;
       }
+      .row-container::before { left: 8vw; }
+      .row-container::after { right: 8vw; }
 
-      h2 { color: #ffffff }
-
-      h2 {
-        margin: 0 0 0.75rem 0;
-        font-weight: 600;
-        padding: 0 08vw;
-        box-sizing: border-box;
+      .row-container.has-left-fade::before {
+        opacity: 1;
+        background: linear-gradient(
+          to right,
+          rgba(14,14,14,0.98) 0%,
+          rgba(14,14,14,0.88) 20%,
+          rgba(14,14,14,0.6) 45%,
+          rgba(14,14,14,0.25) 70%,
+          rgba(14,14,14,0.06) 92%,
+          rgba(14,14,14,0) 100%
+        );
       }
-
-      .loading {
-        color: #6b7280;
-        margin: 1rem 0;
-        padding: 0 08vw;
-        box-sizing: border-box;
+      .row-container.has-right-fade::after {
+        opacity: 1;
+        background: linear-gradient(
+          to left,
+          rgba(14,14,14,0.98) 0%,
+          rgba(14,14,14,0.88) 20%,
+          rgba(14,14,14,0.6) 45%,
+          rgba(14,14,14,0.25) 70%,
+          rgba(14,14,14,0.06) 92%,
+          rgba(14,14,14,0) 100%
+        );
       }
-
-      .controls {
-        display: block;
-      }
-
-      .row-wrapper {
-        position: relative;
-        /* add horizontal inset so every row (including scrollable) shows margins */
-        padding: 0 08vw;
-        box-sizing: border-box;
-      }
-
-      .movies-row {
+      /* Scrollable row */
+      .media-row {
         display: flex;
         gap: 0.75rem;
         overflow-x: auto;
-        /* keep no extra padding here — parent provides the side inset */
         padding: 0.5rem 0;
         scroll-snap-type: x mandatory;
         -webkit-overflow-scrolling: touch;
-      }
-
-      /* hide scrollbar across browsers while keeping scrolling usable */
-      .movies-row::-webkit-scrollbar {
-        display: none;
-      }
-      .movies-row {
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
+      .media-row::-webkit-scrollbar { display: none; }
 
-      .movie-card {
+      /* Card (applies to movies & shows) */
+      .media-card {
+        position: relative;
         scroll-snap-align: start;
         flex: 0 0 220px;
         width: 220px;
@@ -317,7 +334,7 @@ import { Router } from '@angular/router';
         cursor: pointer;
       }
 
-      .poster-image {
+      .media-poster {
         width: 100%;
         height: 330px;
         object-fit: cover;
@@ -326,28 +343,41 @@ import { Router } from '@angular/router';
         will-change: transform;
       }
 
-      .card-info {
+
+      .media-card .card-overlay,
+      .mat-mdc-card-content.card-overlay,
+      .mat-mdc-card-content:last-child.card-overlay {
+        box-sizing: border-box;
+        padding: 0.6rem 0.7rem 8px;
+        height: 60%;
+      }
+
+      /* Overlay that sits on the lower-left of the card */
+      .card-overlay {
         position: absolute;
         left: 0;
-        right: 0;
         bottom: 0;
-        padding: 0.25rem 0.6rem 0.28rem;
+        right: 0;
+        height: 60%;
+        padding: 0.6rem 0.7rem 0.05rem;
         color: #fff;
-        background: linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 28%, rgba(0,0,0,0.18) 56%, rgba(0,0,0,0) 100%);
-        /* remove harsh inset shadow in favor of a smooth gradient fade */
+        background: linear-gradient(to top, rgba(0,0,0,0.96) 0%, rgba(0,0,0,0.88) 20%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.18) 80%, rgba(0,0,0,0) 100%);
         opacity: 0;
         transition: opacity 220ms ease;
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: 1px;
+        justify-content: flex-end;
+        z-index: 10;
       }
 
-      .title {
-        font-size: 0.75rem;
-        line-height: 1.0;
-        color: #111827;
+      .media-title {
+        font-family: 'Staatliches', 'Doto', 'Roboto', system-ui, sans-serif;
+        font-size: 1.1rem;
+        line-height: 1.02;
+        color: #ffffff;
         margin-bottom: 0.12rem;
-        max-height: 2.4rem;
+        max-height: 2.8rem;
         overflow: hidden;
         text-overflow: ellipsis;
         display: -webkit-box;
@@ -355,33 +385,21 @@ import { Router } from '@angular/router';
         -webkit-line-clamp: 2;
       }
 
-      .meta {
+      .media-meta {
+        color: rgba(255,255,255,0.9);
+        font-size: 0.85rem;
         display: flex;
-        justify-content: space-between;
+        justify-content: left;
         align-items: center;
-        font-size: 0.88rem;
-        color: #6b7280;
+        gap: 0.5rem;
+        font-family: 'Staatliches', 'Doto', 'Roboto', system-ui, sans-serif;
       }
 
-      .rating {
-        color: #ffd36a;
-        font-weight: 700;
-        font-size: 0.95rem;
-      }
+      /* Hover / focus interactions */
+      .media-card:hover .media-poster { transform: scale(1.07); }
+      .media-card:hover .card-overlay, .media-card:focus-within .card-overlay { opacity: 1; }
 
-      .title { font-weight:700; font-size:0.98rem; color: #ffffff; }
-      .meta { color: rgba(255,255,255,0.9); font-size:0.85rem; display:flex; justify-content:space-between; align-items:center; }
-
-      .movie-card:hover .poster-image {
-        transform: scale(1.07);
-      }
-
-      .movie-card:hover .card-info,
-      .movie-card:focus-within .card-info {
-        opacity: 1;
-      }
-
-      /* transparent overlay arrows (hidden by default via ngIf until hovering) */
+      /* Scroll buttons */
       .scroll-btn {
         position: absolute;
         top: 50%;
@@ -394,89 +412,75 @@ import { Router } from '@angular/router';
         font-size: 1.35rem;
         line-height: 1;
         border: none;
-        background: rgba(255, 255, 255, 0.4);
+        background: rgba(255, 255, 255, 0.4);\
         color: rgba(17, 24, 39, 0.7);
         cursor: pointer;
         z-index: 20;
         padding: 0;
         border-radius: 6px;
       }
+      .scroll-btn.left { left: 6px; }
+      .scroll-btn.right { right: 6px; }
+      .scroll-btn:hover { color: rgba(17, 24, 39, 0.95); }
 
-      .scroll-btn.left {
-        left: 6px;
+      /* Scroll buttons - aligned with row padding, circular and sleek */
+      .scroll-btn {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 44px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        line-height: 1;
+        border: none;
+        background: rgba(255,255,255,0.06);
+        color: rgba(255,255,255,0.95);
+        cursor: pointer;
+        z-index: 30;
+        padding: 0;
+        border-radius: 50%;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+        backdrop-filter: blur(6px);
+        transition: transform 180ms ease, background 180ms ease, color 180ms ease;
       }
+      .scroll-btn.left { left: 7vw; }
+      .scroll-btn.right { right: 7vw; }
+      .scroll-btn:hover { transform: translateY(-50%) scale(1.06); background: rgba(255,255,255,0.12); color: rgba(0,0,0,0.9); }
 
-      .scroll-btn.right {
-        right: 6px;
-      }
-
-      .scroll-btn:hover {
-        color: rgba(17, 24, 39, 0.95);
-      }
-
-      /* preview sheet */
-      .preview-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.55);
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 360ms ease-out;
-        z-index: 80;
-      }
-
-      .preview-overlay.open {
-        opacity: 1;
-        pointer-events: auto;
-      }
-
+      /* Preview sheet */
+      .preview-overlay { position: fixed; inset: 0; background: #000000c2; opacity: 0; pointer-events: none; transition: opacity 360ms ease-out; z-index: 80; }
+      .preview-overlay.open { opacity: 1; pointer-events: auto; }
 
       .preview-sheet {
-        position: fixed;
-        left: 20vw;
-        right: 20vw;
-        top: 8vh;
+        position: fixed; left: 20vw; right: 20vw; top: 8vh; bottom: 0; background: #030303; border-radius: 12px 12px 0 0;
+        transform: translateY(100vh); opacity: 0; transition: transform 360ms cubic-bezier(.22,.9,.3,1), opacity 220ms ease; pointer-events: none; will-change: transform, opacity; z-index: 90; overflow: auto; color: #fff;
+      }
+      .preview-sheet.open { transform: translateY(0); opacity: 1; pointer-events: auto; }
+
+      .preview-banner { position: relative; width: 100%; height: auto; border-top-left-radius: 12px; border-top-right-radius: 12px; overflow: visible; background: #071018; display: block; }
+      .preview-banner::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
         bottom: 0;
-        background: #071018;
-        /* keep rounded corners at the top only, bottom should be square */
-        border-radius: 12px 12px 0 0;
-        /* start off-screen at the very bottom of the viewport */
-        transform: translateY(100vh);
-        opacity: 0;
-        transition: transform 360ms cubic-bezier(.22,.9,.3,1), opacity 220ms ease;
+        height: 30%; /* cover roughly 30% of the backdrop height */
         pointer-events: none;
-        will-change: transform, opacity;
-        z-index: 90;
-        overflow: auto;
-        color: #fff;
+        z-index: 1;
+        outline-offset: 1px;
+        background: linear-gradient(
+          to top,
+          rgba(0,0,0,0.76) 0%,
+          rgba(0,0,0,0.68) 20%,
+          rgba(0,0,0,0.45) 55%,
+          rgba(0,0,0,0.18) 80%,
+          rgba(0,0,0,0) 100%
+        );
       }
-
-      .preview-sheet.open {
-        transform: translateY(0);
-        opacity: 1;
-        pointer-events: auto;
-      }
-
-      .preview-banner {
-        position: relative;
-        width: 100%;
-        /* allow banner height to be driven by the image so it can grow vertically */
-        height: auto;
-        border-top-left-radius: 12px;
-        border-top-right-radius: 12px;
-        overflow: visible;
-        background: #071018;
-        display: block;
-      }
-
-      .banner-img {
-        display: block;
-        width: 100%;
-        height: auto;
-        object-fit: cover;
-        object-position: center top;
-      }
-
+      .banner-img { display: block; width: 100%; height: auto; object-fit: cover; object-position: center top; }
       .banner-logo {
         position: absolute;
         left: 1rem;
@@ -484,29 +488,45 @@ import { Router } from '@angular/router';
         z-index: 2;
         width: 40%;
         max-width: 40%;
-        /* cap logo height; allow width to shrink proportionally instead of clipping */
         max-height: 30vh;
         background: transparent;
         padding: 0;
         border-radius: 0;
         display: flex;
-        align-items: center;
-        justify-content: flex-start;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-end;
+        gap: 0.5rem;
         overflow: visible;
       }
 
       .banner-logo img { height: auto; max-height: 30vh; width: auto; max-width: 100%; display:block }
 
+      .banner-meta {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .meta-pill {
+        background: rgba(255,255,255,0.06);
+        color: #fff;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid rgba(255,255,255,0.04);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+      }
+
       .preview-body { padding: 1rem 1.5rem 1.5rem; display:block }
-
       .preview-info { margin-top: 8px }
-
       .preview-logo { max-height: 56px; display:block; margin-bottom:8px }
-
       .preview-meta { color: rgba(255,255,255,0.85); font-size:0.95rem; margin-bottom:8px }
-
       .preview-actions { display:flex; gap:8px; margin-bottom:8px }
-
       .preview-overview { color: rgba(255,255,255,0.92); }
     `,
   ],
@@ -550,12 +570,16 @@ export class Home implements OnInit {
 
   hovering = false;
   canScrollLeft = false;
+  canScrollRight = false;
   hoveringContinue = false;
   canScrollLeftContinue = false;
+  canScrollRightContinue = false;
   hoveringPopular = false;
   canScrollLeftPopular = false;
+  canScrollRightPopular = false;
   hoveringTv = false;
   canScrollLeftTv = false;
+  canScrollRightTv = false;
   continueMovies: TmdbMovie[] = [];
   // preview sheet state
   previewOpen = false;
@@ -744,9 +768,11 @@ export class Home implements OnInit {
     const el = this.scrollContainer?.nativeElement;
     if (!el) {
       this.canScrollLeft = false;
+      this.canScrollRight = false;
       return;
     }
     this.canScrollLeft = el.scrollLeft > 5;
+    this.canScrollRight = (el.scrollLeft + el.clientWidth) < (el.scrollWidth - 5);
 
     // if scrolled near the right edge, attempt to load more movies
     if (!this.loadingMoreMovies && (el.scrollLeft + el.clientWidth) >= (el.scrollWidth - 220)) {
@@ -782,9 +808,11 @@ export class Home implements OnInit {
     const el = this.continueScrollContainer?.nativeElement;
     if (!el) {
       this.canScrollLeftContinue = false;
+      this.canScrollRightContinue = false;
       return;
     }
     this.canScrollLeftContinue = el.scrollLeft > 5;
+    this.canScrollRightContinue = (el.scrollLeft + el.clientWidth) < (el.scrollWidth - 5);
   }
 
   scrollContinue(amount: number) {
@@ -809,10 +837,12 @@ export class Home implements OnInit {
     const el = this.popularScrollContainer?.nativeElement;
     if (!el) {
       this.canScrollLeftPopular = false;
+      this.canScrollRightPopular = false;
       return;
     }
     this.canScrollLeftPopular = el.scrollLeft > 5;
 
+    this.canScrollRightPopular = (el.scrollLeft + el.clientWidth) < (el.scrollWidth - 5);
     if (!this.loadingMorePopular && (el.scrollLeft + el.clientWidth) >= (el.scrollWidth - 220)) {
       this.loadMorePopular();
     }
@@ -849,9 +879,11 @@ export class Home implements OnInit {
     const el = this.tvScrollContainer?.nativeElement;
     if (!el) {
       this.canScrollLeftTv = false;
+      this.canScrollRightTv = false;
       return;
     }
     this.canScrollLeftTv = el.scrollLeft > 5;
+    this.canScrollRightTv = (el.scrollLeft + el.clientWidth) < (el.scrollWidth - 5);
 
     if (!this.loadingMoreTv && (el.scrollLeft + el.clientWidth) >= (el.scrollWidth - 220)) {
       this.loadMoreTv();
