@@ -111,18 +111,19 @@ export class TmdbService {
 
   constructor(private readonly http: HttpClient) {}
 
-  getTopRatedMovies(): Observable<TmdbTopRatedResponse> {
-    return this.http.get<TmdbTopRatedResponse>(this.url, { headers: this.headers });
+  getTopRatedMovies(page: number = 1): Observable<TmdbTopRatedResponse> {
+    const url = `${this.base}/movie/top_rated?language=en-US&page=${page}`;
+    return this.http.get<TmdbTopRatedResponse>(url, { headers: this.headers });
   }
 
-  getTopRatedTvShows(): Observable<TmdbTopRatedTvResponse> {
-    const url = `${this.base}/tv/top_rated?language=en-US&page=1`;
+  getTopRatedTvShows(page: number = 1): Observable<TmdbTopRatedTvResponse> {
+    const url = `${this.base}/tv/top_rated?language=en-US&page=${page}`;
     return this.http.get<TmdbTopRatedTvResponse>(url, { headers: this.headers });
   }
 
-  searchMulti(query: string): Observable<any> {
+  searchMulti(query: string, page: number = 1): Observable<any> {
     const q = encodeURIComponent(query);
-    const url = `${this.base}/search/multi?query=${q}&include_adult=true&language=en-US&page=1`;
+    const url = `${this.base}/search/multi?query=${q}&include_adult=true&language=en-US&page=${page}`;
     return this.http.get<any>(url, { headers: this.headers });
   }
 
@@ -131,8 +132,8 @@ export class TmdbService {
     return this.http.get<TmdbSeasonDetails>(url, { headers: this.headers });
   }
 
-  getPopularMovies(): Observable<TmdbTopRatedResponse> {
-    const url = `${this.base}/movie/popular?language=en-US&page=1`;
+  getPopularMovies(page: number = 1): Observable<TmdbTopRatedResponse> {
+    const url = `${this.base}/movie/popular?language=en-US&page=${page}`;
     return this.http.get<TmdbTopRatedResponse>(url, { headers: this.headers });
   }
 
@@ -141,8 +142,18 @@ export class TmdbService {
     return this.http.get<TmdbMovieDetails>(url, { headers: this.headers });
   }
 
+  getMovieImages(tmdbId: number): Observable<any> {
+    const url = `${this.base}/movie/${tmdbId}/images?include_image_language=en-US`;
+    return this.http.get<any>(url, { headers: this.headers });
+  }
+
   getTvDetails(tvId: number): Observable<TmdbTvDetails> {
     const url = `${this.base}/tv/${tvId}?language=en-US`;
     return this.http.get<TmdbTvDetails>(url, { headers: this.headers });
+  }
+
+  getTvImages(tvId: number): Observable<any> {
+    const url = `${this.base}/tv/${tvId}/images?include_image_language=en-US`;
+    return this.http.get<any>(url, { headers: this.headers });
   }
 }

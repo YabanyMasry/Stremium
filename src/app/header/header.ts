@@ -55,20 +55,40 @@ interface SearchItem {
     </header>
   `,
   styles: `
-    .site-header { background: #0f172a; color: #fff; padding: 0.5rem 1rem; }
-    .container { display:flex; align-items:center; justify-content:space-between; max-width:1100px; margin:0 auto; }
+    /* fixed pill-shaped overlay header */
+    .site-header {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 48px);
+      max-width: 1100px;
+      background: rgba(15,23,42,0.9);
+      color: #fff;
+      padding: 0.45rem 0.75rem;
+      border-radius: 999px;
+      box-shadow: 0 8px 30px rgba(2,6,23,0.35);
+      z-index: 1100;
+      backdrop-filter: blur(6px);
+    }
+
+    .container { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:0 6px; }
     .logo { display:flex; align-items:center; gap:0.5rem; cursor:pointer; user-select:none; }
-    .logo-mark { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; background:linear-gradient(135deg,#06b6d4,#7c3aed); border-radius:8px; font-weight:700; }
-    .brand { font-weight:700; font-size:1rem; color:#fff; }
+    .logo-mark { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; background:linear-gradient(135deg,#06b6d4,#7c3aed); border-radius:8px; font-weight:700; }
+    .brand { font-weight:700; font-size:0.98rem; color:#fff; }
+
     .search { position:relative; width:360px; }
-    .search input { width:100%; padding:0.5rem 0.6rem; border-radius:6px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:#fff; }
-    .results { position:absolute; left:0; right:0; top:110%; background:#fff; color:#111827; box-shadow:0 6px 18px rgba(2,6,23,0.24); border-radius:8px; max-height:360px; overflow:auto; z-index:40; }
+    .search input { width:100%; padding:0.5rem 0.6rem; border-radius:999px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.03); color:#fff; }
+
+    .results { position:absolute; left:0; right:0; top:120%; background:#fff; color:#111827; box-shadow:0 6px 18px rgba(2,6,23,0.24); border-radius:8px; max-height:360px; overflow:auto; z-index:1200; }
     .result { display:flex; gap:0.6rem; padding:0.5rem; align-items:center; cursor:pointer; border-bottom:1px solid #eee; }
     .result img { width:48px; height:72px; object-fit:cover; border-radius:4px; }
     .result .meta { font-size:0.9rem; }
     .result .title { font-weight:600; }
     .result .sub { color:#6b7280; font-size:0.85rem; }
     .empty { padding:0.5rem; color:#6b7280; }
+
+    /* ensure page content isn't hidden behind header: add top padding to body via a global rule is preferable, but we keep header overlay only here */
   `,
 })
 export class Header {

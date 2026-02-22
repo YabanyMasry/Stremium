@@ -1,5 +1,7 @@
 import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
-import { NgFor, NgIf, SlicePipe } from '@angular/common';
+import { NgFor, NgIf, SlicePipe, NgStyle } from '@angular/common';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { TmdbMovie, TmdbTv, TmdbService } from '../services/tmdb.service';
 import { MatCardModule } from '@angular/material/card';
 import { Router } from '@angular/router';
@@ -7,18 +9,19 @@ import { Router } from '@angular/router';
 @Component({
   standalone: true,
   selector: 'app-home',
-  imports: [NgFor, NgIf, SlicePipe, MatCardModule],
+  imports: [NgFor, NgIf, SlicePipe, NgStyle, MatCardModule],
   template: `
     <section class="movies-section">
       <h2>Continue Watching</h2>
       <p *ngIf="isLoading && continueList.length === 0" class="loading">Loading...</p>
-
+      
       <div *ngIf="continueList.length > 0" class="controls">
         <div class="row-wrapper" (mouseenter)="hoveringContinue = true" (mouseleave)="hoveringContinue = false">
           <div #continueScrollContainer class="movies-row" tabindex="0" role="list" (scroll)="onScrollContinue()">
-            <mat-card *ngFor="let item of continueList" class="movie-card" role="listitem" tabindex="0" (click)="openContinue(item)" (keydown.enter)="openContinue(item)">
+              <mat-card *ngFor="let item of continueList" class="movie-card" role="listitem" tabindex="0" (click)="openPreview(item.media_type, item.id, item)" (keydown.enter)="openPreview(item.media_type, item.id, item)">
               <img *ngIf="item.poster_path" mat-card-image [src]="'https://image.tmdb.org/t/p/w500' + item.poster_path" [alt]="item.title + ' poster'" class="poster-image" />
               <mat-card-content class="card-info">
+                <div class="title">{{ item.title }}</div>
                 <div class="meta">
                   <span class="year">{{ item.release_date | slice:0:4 }}</span>
                   <span class="rating"> {{ item.vote_average.toFixed(1) }}</span>
@@ -52,8 +55,8 @@ import { Router } from '@angular/router';
                 class="movie-card"
                 role="listitem"
                 tabindex="0"
-                (click)="openShow(show.id)"
-                (keydown.enter)="openShow(show.id)"
+                (click)="openPreview('tv', show.id, show)"
+                (keydown.enter)="openPreview('tv', show.id, show)"
               >
                 <img
                   *ngIf="show.poster_path"
@@ -63,6 +66,7 @@ import { Router } from '@angular/router';
                   class="poster-image"
                 />
                 <mat-card-content class="card-info">
+                  <div class="title">{{ show.name }}</div>
                   <div class="meta">
                     <span class="year">{{ show.first_air_date | slice:0:4 }}</span>
                     <span class="rating"> {{ show.vote_average.toFixed(1) }}</span>
@@ -113,8 +117,8 @@ import { Router } from '@angular/router';
               class="movie-card"
               role="listitem"
               tabindex="0"
-              (click)="openMovie(movie.id)"
-              (keydown.enter)="openMovie(movie.id)"
+              (click)="openPreview('movie', movie.id, movie)"
+              (keydown.enter)="openPreview('movie', movie.id, movie)"
             >
               <img
                 *ngIf="movie.poster_path"
@@ -124,6 +128,7 @@ import { Router } from '@angular/router';
                 class="poster-image"
               />
               <mat-card-content class="card-info">
+                <div class="title">{{ movie.title }}</div>
                 <div class="meta">
                   <span class="year">{{ movie.release_date | slice:0:4 }}</span>
                   <span class="rating"> {{ movie.vote_average.toFixed(1) }}</span>
@@ -172,8 +177,8 @@ import { Router } from '@angular/router';
               class="movie-card"
               role="listitem"
               tabindex="0"
-              (click)="openMovie(movie.id)"
-              (keydown.enter)="openMovie(movie.id)"
+              (click)="openPreview('movie', movie.id, movie)"
+              (keydown.enter)="openPreview('movie', movie.id, movie)"
             >
               <img
                 *ngIf="movie.poster_path"
@@ -183,6 +188,7 @@ import { Router } from '@angular/router';
                 class="poster-image"
               />
               <mat-card-content class="card-info">
+                <div class="title">{{ movie.title }}</div>
                 <div class="meta">
                   <span class="year">{{ movie.release_date | slice:0:4 }}</span>
                   <span class="rating"> {{ movie.vote_average.toFixed(1) }}</span>
@@ -211,21 +217,62 @@ import { Router } from '@angular/router';
         </div>
       </div>
     </section>
+
+      <!-- preview overlay + sheet -->
+      <div class="preview-overlay" [class.open]="previewOpen" (click)="closePreview()"></div>
+      <div class="preview-sheet" [class.open]="previewOpen" role="dialog" aria-modal="true" [attr.aria-hidden]="!previewOpen">
+        <div class="preview-banner">
+          <img *ngIf="previewData?.backdrop_path" class="banner-img" [src]="'https://image.tmdb.org/t/p/original' + previewData.backdrop_path" alt="backdrop" />
+          <div *ngIf="previewData?.logo_path" class="banner-logo">
+            <img [src]="'https://image.tmdb.org/t/p/w500' + previewData.logo_path" alt="logo" />
+          </div>
+        </div>
+        <div class="preview-body">
+          <div class="preview-info">
+            <div style="font-size:1.25rem; font-weight:700">{{ previewData?.title }}</div>
+            <div class="preview-meta">
+              <span *ngIf="previewData?.release_date">{{ previewData.release_date | slice:0:4 }}</span>
+              <span style="margin-left:8px">•</span>
+              <span style="margin-left:8px">{{ previewData?.vote_average?.toFixed(1) }}</span>
+              <span *ngIf="previewData?.genres?.length" style="margin-left:12px">• {{ previewData.genres.join(', ') }}</span>
+            </div>
+            <div class="preview-actions">
+              <button (click)="playFromPreview()">Play</button>
+              <button (click)="closePreview()">Close</button>
+            </div>
+            <div class="preview-overview">
+              <p *ngIf="previewData?.overview">{{ previewData.overview }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
   `,
   styles: [
     `
+      :host {
+        display: block;
+        min-height: 100vh;
+        background: #1f2937;
+      }
+
       .movies-section {
         padding: 1rem 1.25rem;
       }
 
+      h2 { color: #ffffff }
+
       h2 {
         margin: 0 0 0.75rem 0;
         font-weight: 600;
+        padding: 0 08vw;
+        box-sizing: border-box;
       }
 
       .loading {
         color: #6b7280;
         margin: 1rem 0;
+        padding: 0 08vw;
+        box-sizing: border-box;
       }
 
       .controls {
@@ -234,13 +281,17 @@ import { Router } from '@angular/router';
 
       .row-wrapper {
         position: relative;
+        /* add horizontal inset so every row (including scrollable) shows margins */
+        padding: 0 08vw;
+        box-sizing: border-box;
       }
 
       .movies-row {
         display: flex;
         gap: 0.75rem;
         overflow-x: auto;
-        padding: 0.5rem 0.5rem;
+        /* keep no extra padding here — parent provides the side inset */
+        padding: 0.5rem 0;
         scroll-snap-type: x mandatory;
         -webkit-overflow-scrolling: touch;
       }
@@ -256,11 +307,11 @@ import { Router } from '@angular/router';
 
       .movie-card {
         scroll-snap-align: start;
-        flex: 0 0 180px;
-        width: 180px;
-        border-radius: 8px;
-        background: #ffffff;
-        border: 1px solid #e6e6e6;
+        flex: 0 0 220px;
+        width: 220px;
+        border-radius: 10px;
+        background: transparent;
+        border: 0;
         box-shadow: none;
         overflow: hidden;
         cursor: pointer;
@@ -268,20 +319,34 @@ import { Router } from '@angular/router';
 
       .poster-image {
         width: 100%;
-        height: 270px;
+        height: 330px;
         object-fit: cover;
         display: block;
+        transition: transform 300ms ease;
+        will-change: transform;
       }
 
       .card-info {
-        padding: 0.6rem 0.65rem;
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 0.25rem 0.6rem 0.28rem;
+        color: #fff;
+        background: linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 28%, rgba(0,0,0,0.18) 56%, rgba(0,0,0,0) 100%);
+        /* remove harsh inset shadow in favor of a smooth gradient fade */
+        opacity: 0;
+        transition: opacity 220ms ease;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
       }
 
       .title {
-        font-size: 0.95rem;
-        line-height: 1.2;
+        font-size: 0.75rem;
+        line-height: 1.0;
         color: #111827;
-        margin-bottom: 0.35rem;
+        margin-bottom: 0.12rem;
         max-height: 2.4rem;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -299,8 +364,21 @@ import { Router } from '@angular/router';
       }
 
       .rating {
-        color: #d18d16;
-        font-weight: 600;
+        color: #ffd36a;
+        font-weight: 700;
+        font-size: 0.95rem;
+      }
+
+      .title { font-weight:700; font-size:0.98rem; color: #ffffff; }
+      .meta { color: rgba(255,255,255,0.9); font-size:0.85rem; display:flex; justify-content:space-between; align-items:center; }
+
+      .movie-card:hover .poster-image {
+        transform: scale(1.07);
+      }
+
+      .movie-card:hover .card-info,
+      .movie-card:focus-within .card-info {
+        opacity: 1;
       }
 
       /* transparent overlay arrows (hidden by default via ngIf until hovering) */
@@ -335,6 +413,101 @@ import { Router } from '@angular/router';
       .scroll-btn:hover {
         color: rgba(17, 24, 39, 0.95);
       }
+
+      /* preview sheet */
+      .preview-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.55);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 360ms ease-out;
+        z-index: 80;
+      }
+
+      .preview-overlay.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+
+      .preview-sheet {
+        position: fixed;
+        left: 20vw;
+        right: 20vw;
+        top: 8vh;
+        bottom: 0;
+        background: #071018;
+        /* keep rounded corners at the top only, bottom should be square */
+        border-radius: 12px 12px 0 0;
+        /* start off-screen at the very bottom of the viewport */
+        transform: translateY(100vh);
+        opacity: 0;
+        transition: transform 360ms cubic-bezier(.22,.9,.3,1), opacity 220ms ease;
+        pointer-events: none;
+        will-change: transform, opacity;
+        z-index: 90;
+        overflow: auto;
+        color: #fff;
+      }
+
+      .preview-sheet.open {
+        transform: translateY(0);
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .preview-banner {
+        position: relative;
+        width: 100%;
+        /* allow banner height to be driven by the image so it can grow vertically */
+        height: auto;
+        border-top-left-radius: 12px;
+        border-top-right-radius: 12px;
+        overflow: visible;
+        background: #071018;
+        display: block;
+      }
+
+      .banner-img {
+        display: block;
+        width: 100%;
+        height: auto;
+        object-fit: cover;
+        object-position: center top;
+      }
+
+      .banner-logo {
+        position: absolute;
+        left: 1rem;
+        bottom: 1rem;
+        z-index: 2;
+        width: 40%;
+        max-width: 40%;
+        /* cap logo height; allow width to shrink proportionally instead of clipping */
+        max-height: 30vh;
+        background: transparent;
+        padding: 0;
+        border-radius: 0;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        overflow: visible;
+      }
+
+      .banner-logo img { height: auto; max-height: 30vh; width: auto; max-width: 100%; display:block }
+
+      .preview-body { padding: 1rem 1.5rem 1.5rem; display:block }
+
+      .preview-info { margin-top: 8px }
+
+      .preview-logo { max-height: 56px; display:block; margin-bottom:8px }
+
+      .preview-meta { color: rgba(255,255,255,0.85); font-size:0.95rem; margin-bottom:8px }
+
+      .preview-actions { display:flex; gap:8px; margin-bottom:8px }
+
+      .preview-overview { color: rgba(255,255,255,0.92); }
     `,
   ],
 })
@@ -349,6 +522,19 @@ export class Home implements OnInit {
 
   moviesPopular: TmdbMovie[] = [];
   tvShows: TmdbTv[] = [];
+
+  // pagination state for infinite scroll
+  moviesPage = 1;
+  moviesTotalPages = 1;
+  loadingMoreMovies = false;
+
+  popularPage = 1;
+  popularTotalPages = 1;
+  loadingMorePopular = false;
+
+  tvPage = 1;
+  tvTotalPages = 1;
+  loadingMoreTv = false;
 
   // combined continue list: movies and shows (shows include season/episode in progress)
   continueList: Array<{
@@ -371,13 +557,20 @@ export class Home implements OnInit {
   hoveringTv = false;
   canScrollLeftTv = false;
   continueMovies: TmdbMovie[] = [];
+  // preview sheet state
+  previewOpen = false;
+  previewLoading = false;
+  previewData: any = null;
+  previewBackdropStyle = '';
 
-  constructor(private readonly tmdb: TmdbService, private readonly router: Router) {}
+  constructor(private readonly tmdb: TmdbService, private readonly router: Router) { }
 
   ngOnInit(): void {
     this.tmdb.getTopRatedMovies().subscribe({
       next: (response) => {
         this.movies = response.results.filter((movie) => movie.original_language === 'en');
+        this.moviesPage = response.page || 1;
+        this.moviesTotalPages = response.total_pages || 1;
         this.isLoading = false;
         // let DOM render, then initialize scroll state
         setTimeout(() => this.onScroll(), 0);
@@ -393,6 +586,8 @@ export class Home implements OnInit {
     this.tmdb.getPopularMovies().subscribe({
       next: (response) => {
         this.moviesPopular = response.results.filter((movie) => movie.original_language === 'en');
+        this.popularPage = response.page || 1;
+        this.popularTotalPages = response.total_pages || 1;
         // let DOM render, then initialize scroll state
         setTimeout(() => this.onScrollPopular(), 0);
       },
@@ -404,6 +599,8 @@ export class Home implements OnInit {
     this.tmdb.getTopRatedTvShows().subscribe({
       next: (response) => {
         this.tvShows = response.results.filter((s) => s.original_language === 'en');
+        this.tvPage = response.page || 1;
+        this.tvTotalPages = response.total_pages || 1;
         setTimeout(() => this.onScrollTv(), 0);
       },
       error: (err) => {
@@ -414,6 +611,72 @@ export class Home implements OnInit {
     // refresh continue list when other components save progress
     window.addEventListener('continueMoviesUpdated', () => this.loadContinueFromStorage());
     window.addEventListener('continueShowsUpdated', () => this.loadContinueFromStorage());
+  }
+
+  openPreview(mediaType: 'movie' | 'tv', id: number, item?: any) {
+    this.previewOpen = true;
+    this.previewLoading = true;
+    this.previewData = null;
+
+    if (mediaType === 'movie') {
+      forkJoin({
+        details: this.tmdb.getMovieDetails(id).pipe(catchError(() => of(null))),
+        images: this.tmdb.getMovieImages(id).pipe(catchError(() => of(null))),
+      }).subscribe(({ details, images }: any) => {
+        this.previewLoading = false;
+        if (!details) return;
+        const logo = (images?.logos || [])[0];
+        this.previewData = {
+          id: details.id,
+          media_type: 'movie',
+          title: details.title,
+          overview: details.overview,
+          genres: details.genres?.map((g: any) => g.name) || [],
+          vote_average: details.vote_average,
+          release_date: details.release_date,
+          poster_path: details.poster_path,
+          // prefer the details backdrop_path (use TMDB details endpoint)
+          backdrop_path: details.backdrop_path || images?.backdrops?.[0]?.file_path || null,
+          logo_path: logo?.file_path || null,
+        };
+        this.previewBackdropStyle = this.previewData.backdrop_path ? `linear-gradient(180deg, rgba(7,16,24,0.0), rgba(7,16,24,0.85)), url('https://image.tmdb.org/t/p/original${this.previewData.backdrop_path}')` : '';
+      });
+    } else {
+      forkJoin({
+        details: this.tmdb.getTvDetails(id).pipe(catchError(() => of(null))),
+        images: this.tmdb.getTvImages(id).pipe(catchError(() => of(null))),
+      }).subscribe(({ details, images }: any) => {
+        this.previewLoading = false;
+        if (!details) return;
+        const logo = (images?.logos || [])[0];
+        this.previewData = {
+          id: details.id,
+          media_type: 'tv',
+          title: details.name,
+          overview: details.overview,
+          genres: details.genres?.map((g: any) => g.name) || [],
+          vote_average: details.vote_average,
+          release_date: details.first_air_date,
+          poster_path: details.poster_path,
+          backdrop_path: details.backdrop_path || images?.backdrops?.[0]?.file_path || null,
+          logo_path: logo?.file_path || null,
+        };
+        this.previewBackdropStyle = this.previewData.backdrop_path ? `linear-gradient(180deg, rgba(7,16,24,0.0), rgba(7,16,24,0.85)), url('https://image.tmdb.org/t/p/original${this.previewData.backdrop_path}')` : '';
+      });
+    }
+  }
+
+  closePreview() {
+    this.previewOpen = false;
+    this.previewData = null;
+    this.previewBackdropStyle = '';
+  }
+
+  playFromPreview() {
+    if (!this.previewData) return;
+    const item: any = { id: this.previewData.id, media_type: this.previewData.media_type };
+    this.closePreview();
+    this.openContinue(item);
   }
 
   private loadContinueFromStorage() {
@@ -442,7 +705,7 @@ export class Home implements OnInit {
               vote_average: m.vote_average,
             });
           },
-          error: () => {},
+          error: () => { },
         });
       });
     }
@@ -471,7 +734,7 @@ export class Home implements OnInit {
               episode: e.episode ?? null,
             });
           },
-          error: () => {},
+          error: () => { },
         });
       });
     }
@@ -484,6 +747,11 @@ export class Home implements OnInit {
       return;
     }
     this.canScrollLeft = el.scrollLeft > 5;
+
+    // if scrolled near the right edge, attempt to load more movies
+    if (!this.loadingMoreMovies && (el.scrollLeft + el.clientWidth) >= (el.scrollWidth - 220)) {
+      this.loadMoreMovies();
+    }
   }
 
   scroll(amount: number) {
@@ -492,6 +760,22 @@ export class Home implements OnInit {
     el.scrollBy({ left: amount, behavior: 'smooth' });
     // update left arrow visibility after scroll (best-effort)
     setTimeout(() => this.onScroll(), 250);
+  }
+
+  private loadMoreMovies() {
+    if (this.moviesPage >= this.moviesTotalPages) return;
+    this.loadingMoreMovies = true;
+    const next = this.moviesPage + 1;
+    this.tmdb.getTopRatedMovies(next).subscribe({
+      next: (res) => {
+        const more = res.results.filter((m) => m.original_language === 'en');
+        this.movies.push(...more);
+        this.moviesPage = res.page || this.moviesPage;
+        this.moviesTotalPages = res.total_pages || this.moviesTotalPages;
+        this.loadingMoreMovies = false;
+      },
+      error: () => (this.loadingMoreMovies = false),
+    });
   }
 
   onScrollContinue() {
@@ -528,6 +812,10 @@ export class Home implements OnInit {
       return;
     }
     this.canScrollLeftPopular = el.scrollLeft > 5;
+
+    if (!this.loadingMorePopular && (el.scrollLeft + el.clientWidth) >= (el.scrollWidth - 220)) {
+      this.loadMorePopular();
+    }
   }
 
   scrollPopular(amount: number) {
@@ -535,6 +823,22 @@ export class Home implements OnInit {
     if (!el) return;
     el.scrollBy({ left: amount, behavior: 'smooth' });
     setTimeout(() => this.onScrollPopular(), 250);
+  }
+
+  private loadMorePopular() {
+    if (this.popularPage >= this.popularTotalPages) return;
+    this.loadingMorePopular = true;
+    const next = this.popularPage + 1;
+    this.tmdb.getPopularMovies(next).subscribe({
+      next: (res) => {
+        const more = res.results.filter((m) => m.original_language === 'en');
+        this.moviesPopular.push(...more);
+        this.popularPage = res.page || this.popularPage;
+        this.popularTotalPages = res.total_pages || this.popularTotalPages;
+        this.loadingMorePopular = false;
+      },
+      error: () => (this.loadingMorePopular = false),
+    });
   }
 
   openShow(tmdbId: number) {
@@ -548,6 +852,10 @@ export class Home implements OnInit {
       return;
     }
     this.canScrollLeftTv = el.scrollLeft > 5;
+
+    if (!this.loadingMoreTv && (el.scrollLeft + el.clientWidth) >= (el.scrollWidth - 220)) {
+      this.loadMoreTv();
+    }
   }
 
   scrollTv(amount: number) {
@@ -555,6 +863,22 @@ export class Home implements OnInit {
     if (!el) return;
     el.scrollBy({ left: amount, behavior: 'smooth' });
     setTimeout(() => this.onScrollTv(), 250);
+  }
+
+  private loadMoreTv() {
+    if (this.tvPage >= this.tvTotalPages) return;
+    this.loadingMoreTv = true;
+    const next = this.tvPage + 1;
+    this.tmdb.getTopRatedTvShows(next).subscribe({
+      next: (res) => {
+        const more = res.results.filter((s) => s.original_language === 'en');
+        this.tvShows.push(...more);
+        this.tvPage = res.page || this.tvPage;
+        this.tvTotalPages = res.total_pages || this.tvTotalPages;
+        this.loadingMoreTv = false;
+      },
+      error: () => (this.loadingMoreTv = false),
+    });
   }
 
   openMovie(tmdbId: number) {
