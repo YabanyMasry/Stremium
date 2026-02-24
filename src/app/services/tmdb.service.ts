@@ -109,6 +109,20 @@ export class TmdbService {
     Authorization: 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIxMjJmYzc1OGZmMWIxMmUyOThmMWMwODgwYjVlOTdhMyIsIm5iZiI6MTc3MTEwMTUyOS4wNzQsInN1YiI6IjY5OTBkZDU5YjQzZDg0ZWI4MjFhZTk3ZiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.6EWzDRl7ZBQ0A3djssW1u7ggfO-9vSCK4qcY9cxU62s'
   });
 
+  /** Static TMDB genre-id → name map (movies + TV combined) */
+  static readonly GENRE_MAP: Record<number, string> = {
+    28: 'Action', 12: 'Adventure', 16: 'Animation', 35: 'Comedy', 80: 'Crime',
+    99: 'Documentary', 18: 'Drama', 10751: 'Family', 14: 'Fantasy', 36: 'History',
+    27: 'Horror', 10402: 'Music', 9648: 'Mystery', 10749: 'Romance',
+    878: 'Sci-Fi', 10770: 'TV Movie', 53: 'Thriller', 10752: 'War', 37: 'Western',
+    10759: 'Action & Adventure', 10762: 'Kids', 10763: 'News', 10764: 'Reality',
+    10765: 'Sci-Fi & Fantasy', 10766: 'Soap', 10767: 'Talk', 10768: 'War & Politics',
+  };
+
+  static idsToGenres(ids?: number[]): string[] {
+    return (ids || []).map((id) => TmdbService.GENRE_MAP[id]).filter(Boolean);
+  }
+
   constructor(private readonly http: HttpClient) {}
 
   getTopRatedMovies(page: number = 1): Observable<TmdbTopRatedResponse> {
@@ -137,6 +151,11 @@ export class TmdbService {
     return this.http.get<TmdbTopRatedResponse>(url, { headers: this.headers });
   }
 
+  getPopularTvShows(page: number = 1): Observable<TmdbTopRatedTvResponse> {
+    const url = `${this.base}/tv/popular?language=en-US&page=${page}`;
+    return this.http.get<TmdbTopRatedTvResponse>(url, { headers: this.headers });
+  }
+
   getMovieDetails(tmdbId: number): Observable<TmdbMovieDetails> {
     const url = `${this.base}/movie/${tmdbId}?language=en-US`;
     return this.http.get<TmdbMovieDetails>(url, { headers: this.headers });
@@ -155,5 +174,29 @@ export class TmdbService {
   getTvImages(tvId: number): Observable<any> {
     const url = `${this.base}/tv/${tvId}/images?include_image_language=en-US`;
     return this.http.get<any>(url, { headers: this.headers });
+  }
+
+  // ── Genre lists ──
+
+  getMovieGenres(): Observable<{ genres: { id: number; name: string }[] }> {
+    const url = `${this.base}/genre/movie/list?language=en-US`;
+    return this.http.get<{ genres: { id: number; name: string }[] }>(url, { headers: this.headers });
+  }
+
+  getTvGenres(): Observable<{ genres: { id: number; name: string }[] }> {
+    const url = `${this.base}/genre/tv/list?language=en-US`;
+    return this.http.get<{ genres: { id: number; name: string }[] }>(url, { headers: this.headers });
+  }
+
+  // ── Discover by genre ──
+
+  discoverMoviesByGenre(genreId: number, page = 1): Observable<TmdbTopRatedResponse> {
+    const url = `${this.base}/discover/movie?language=en-US&sort_by=vote_average.desc&with_genres=${genreId}&vote_count.gte=50&page=${page}`;
+    return this.http.get<TmdbTopRatedResponse>(url, { headers: this.headers });
+  }
+
+  discoverTvByGenre(genreId: number, page = 1): Observable<TmdbTopRatedTvResponse> {
+    const url = `${this.base}/discover/tv?language=en-US&sort_by=vote_average.desc&with_genres=${genreId}&vote_count.gte=50&page=${page}`;
+    return this.http.get<TmdbTopRatedTvResponse>(url, { headers: this.headers });
   }
 }

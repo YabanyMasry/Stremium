@@ -1,7 +1,11 @@
 /* You can add global styles to this file, and also import other style files */
 
 html, body { height: 100%; }
-body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; padding-top: 80px; background: #0e0e0e; color: #ffffff; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; padding-top: 0; background: #0e0e0e; color: #ffffff; }
 
 /* ensure root elements fill viewport so component :host backgrounds cover top */
 app-root, body, html { min-height: 100vh; }
+
+/* hide scrollbars globally while keeping scroll functional */
+* { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { display: none; }
