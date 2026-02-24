@@ -17,6 +17,7 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
         [src]="embedUrl"
         [title]="'Player for ' + show.name"
         [saved]="savedToContinue"
+        [progressKey]="progressKey"
         (overlaySave)="saveToContinue()"
       ></app-player>
 
@@ -44,6 +45,7 @@ export class ShowComponent implements OnInit {
   embedUrl: SafeResourceUrl | null = null;
   selectedSeason = 1;
   selectedEpisodeNumber = 1;
+  progressKey: string | null = null;
 
   private readonly storageKeyShows = 'continueShows';
   savedToContinue = false;
@@ -90,7 +92,11 @@ export class ShowComponent implements OnInit {
         if (qSeason) this.selectedSeason = qSeason;
         if (qEpisode) this.selectedEpisodeNumber = qEpisode;
 
-        const raw = this.vidsrc.getEmbedUrlByTmdbTv(s.id, this.selectedSeason, this.selectedEpisodeNumber);
+        this.progressKey = `tv_${s.id}_${this.selectedSeason}_${this.selectedEpisodeNumber}`;
+        const savedTime = PlayerComponent.getSavedTime(this.progressKey);
+        const extra: Record<string, string> = {};
+        if (savedTime > 0) extra['t'] = String(savedTime);
+        const raw = this.vidsrc.getEmbedUrlByTmdbTv(s.id, this.selectedSeason, this.selectedEpisodeNumber, extra);
         this.embedUrl = raw ? this.sanitizer.bypassSecurityTrustResourceUrl(raw) : null;
       },
       error: (err) => console.error(err),

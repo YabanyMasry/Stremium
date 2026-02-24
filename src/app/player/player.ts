@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, NgZone } from '@angular/core';
 import { NgIf } from '@angular/common';
 import { Router } from '@angular/router';
 import { SafeResourceUrl } from '@angular/platform-browser';
@@ -97,13 +97,54 @@ import { SafeResourceUrl } from '@angular/platform-browser';
     }
   `],
 })
-export class PlayerComponent {
+export class PlayerComponent implements OnInit, OnDestroy {
   @Input() src: SafeResourceUrl | null = null;
   @Input() title = '';
   @Input() saved = false;
+  /** localStorage key used to persist playback position (e.g. "movie_123" or "tv_456_1_3") */
+  @Input() progressKey: string | null = null;
   @Output() overlaySave = new EventEmitter<void>();
 
-  constructor(private readonly router: Router) {}
+  private static readonly STORAGE_KEY = 'playbackProgress';
+  private static readonly THROTTLE_MS = 5_000;
+  private messageHandler: ((e: MessageEvent) => void) | null = null;
+  private lastSaveTime = 0;
+
+  constructor(private readonly router: Router, private readonly zone: NgZone) {}
+
+  ngOnInit(): void {
+    this.messageHandler = (e: MessageEvent) => {
+      const d = e.data;
+      if (!d || d.type !== 'cinesrc:timeupdate') return;
+      if (!this.progressKey) return;
+      const now = Date.now();
+      if (now - this.lastSaveTime < PlayerComponent.THROTTLE_MS) return;
+      this.lastSaveTime = now;
+      this.zone.runOutsideAngular(() => {
+        try {
+          const map: Record<string, number> = JSON.parse(localStorage.getItem(PlayerComponent.STORAGE_KEY) || '{}');
+          map[this.progressKey!] = Math.floor(d.currentTime);
+          localStorage.setItem(PlayerComponent.STORAGE_KEY, JSON.stringify(map));
+        } catch { /* ignore */ }
+      });
+    };
+    window.addEventListener('message', this.messageHandler);
+  }
+
+  ngOnDestroy(): void {
+    if (this.messageHandler) {
+      window.removeEventListener('message', this.messageHandler);
+      this.messageHandler = null;
+    }
+  }
+
+  /** Read saved playback seconds for the given key, or 0 */
+  static getSavedTime(key: string): number {
+    try {
+      const map: Record<string, number> = JSON.parse(localStorage.getItem(PlayerComponent.STORAGE_KEY) || '{}');
+      return map[key] ?? 0;
+    } catch { return 0; }
+  }
 
   goHome() {
     this.router.navigate(['/']);

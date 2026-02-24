@@ -17,6 +17,7 @@ import { PlayerComponent } from '../player/player';
         [src]="embedUrl"
         [title]="'Player for ' + movie.title"
         [saved]="savedToContinue"
+        [progressKey]="progressKey"
         (overlaySave)="saveToContinue()"
       ></app-player>
 
@@ -50,6 +51,7 @@ import { PlayerComponent } from '../player/player';
 export class MovieComponent implements OnInit {
   movie: TmdbMovieDetails | null = null;
   embedUrl: SafeResourceUrl | null = null;
+  progressKey: string | null = null;
 
   private readonly storageKey = 'continueMovies';
   savedToContinue = false;
@@ -68,8 +70,13 @@ export class MovieComponent implements OnInit {
     this.tmdb.getMovieDetails(id).subscribe({
       next: (m) => {
         this.movie = m;
+        // build progress key and check for saved time
+        this.progressKey = `movie_${m.id}`;
+        const savedTime = PlayerComponent.getSavedTime(this.progressKey);
+        const extra: Record<string, string> = {};
+        if (savedTime > 0) extra['t'] = String(savedTime);
         // build embed url using the TMDB id (service returns string)
-        const raw = this.vidsrc.getEmbedUrlByTmdb(m.id);
+        const raw = this.vidsrc.getEmbedUrlByTmdb(m.id, extra);
         this.embedUrl = raw ? this.sanitizer.bypassSecurityTrustResourceUrl(raw) : null;
       },
       error: (err) => {
