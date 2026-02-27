@@ -5,6 +5,7 @@ import { TmdbService, TmdbMovieDetails } from '../services/tmdb.service';
 import { VidsrcService } from '../services/vidsrc.service';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { PlayerComponent } from '../player/player';
+import { PartyService } from '../services/party.service';
 
 @Component({
   selector: 'app-movie',
@@ -60,7 +61,8 @@ export class MovieComponent implements OnInit {
     private readonly route: ActivatedRoute,
     private readonly tmdb: TmdbService,
     private readonly vidsrc: VidsrcService,
-    private readonly sanitizer: DomSanitizer
+    private readonly sanitizer: DomSanitizer,
+    private readonly party: PartyService,
   ) {}
 
   ngOnInit(): void {
@@ -78,6 +80,10 @@ export class MovieComponent implements OnInit {
         // build embed url using the TMDB id (service returns string)
         const raw = this.vidsrc.getEmbedUrlByTmdb(m.id, extra);
         this.embedUrl = raw ? this.sanitizer.bypassSecurityTrustResourceUrl(raw) : null;
+
+        // Register content with party service for watch-together
+        this.party.currentContent = { contentType: 'movie', tmdbId: m.id };
+        this.party.broadcastContent();
       },
       error: (err) => {
         console.error(err);

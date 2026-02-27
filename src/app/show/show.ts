@@ -5,6 +5,7 @@ import { TmdbService, TmdbTvDetails } from '../services/tmdb.service';
 import { VidsrcService } from '../services/vidsrc.service';
 import { PlayerComponent } from '../player/player';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { PartyService } from '../services/party.service';
 
 @Component({
   selector: 'app-show',
@@ -54,7 +55,8 @@ export class ShowComponent implements OnInit {
     private readonly route: ActivatedRoute,
     private readonly tmdb: TmdbService,
     private readonly vidsrc: VidsrcService,
-    private readonly sanitizer: DomSanitizer
+    private readonly sanitizer: DomSanitizer,
+    private readonly party: PartyService,
   ) {}
 
   ngOnInit(): void {
@@ -98,6 +100,15 @@ export class ShowComponent implements OnInit {
         if (savedTime > 0) extra['t'] = String(savedTime);
         const raw = this.vidsrc.getEmbedUrlByTmdbTv(s.id, this.selectedSeason, this.selectedEpisodeNumber, extra);
         this.embedUrl = raw ? this.sanitizer.bypassSecurityTrustResourceUrl(raw) : null;
+
+        // Register content with party service for watch-together
+        this.party.currentContent = {
+          contentType: 'tv',
+          tmdbId: s.id,
+          season: this.selectedSeason,
+          episode: this.selectedEpisodeNumber,
+        };
+        this.party.broadcastContent();
       },
       error: (err) => console.error(err),
     });

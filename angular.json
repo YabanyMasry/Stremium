@@ -54,6 +54,9 @@
             "styles": [
               "src/custom-theme.scss",
               "src/styles.css"
+            ],
+            "allowedCommonJsDependencies": [
+              "peerjs"
             ]
           },
           "configurations": {

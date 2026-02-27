@@ -1,19 +1,37 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, NgZone } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, NgZone, ElementRef, ViewChild } from '@angular/core';
 import { NgIf } from '@angular/common';
 import { Router } from '@angular/router';
 import { SafeResourceUrl } from '@angular/platform-browser';
+import { Subscription } from 'rxjs';
+import { PartyService, SyncEvent } from '../services/party.service';
+import { PartyOverlayComponent } from '../party/party-overlay';
 
 @Component({
   selector: 'app-player',
   standalone: true,
-  imports: [NgIf],
+  imports: [NgIf, PartyOverlayComponent],
   template: `
     <div class="player-shell">
       <button class="back-btn" (click)="goHome()" aria-label="Back to home">
         <img src="assets/Stream 1.png" alt="Stream" class="back-logo" />
       </button>
 
+      <!-- Watch Party overlay — top-center of player -->
+      <app-party-overlay></app-party-overlay>
+
+      <!-- Error fallback UI (best practice: handle errors gracefully) -->
+      <div *ngIf="playerError" class="player-error">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>{{ playerError }}</span>
+      </div>
+
       <iframe
+        #playerFrame
         *ngIf="src"
         [src]="src"
         width="100%"
@@ -95,6 +113,31 @@ import { SafeResourceUrl } from '@angular/platform-browser';
       background: transparent;
       cursor: pointer;
     }
+
+    .player-error {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 55;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      border-radius: 12px;
+      background: rgba(220,38,38,0.85);
+      backdrop-filter: blur(10px);
+      color: #fff;
+      font-size: 0.84rem;
+      font-family: 'Roboto', system-ui, sans-serif;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.45);
+      animation: errorSlideUp 300ms ease;
+      white-space: nowrap;
+    }
+    @keyframes errorSlideUp {
+      from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
   `],
 })
 export class PlayerComponent implements OnInit, OnDestroy {
@@ -105,30 +148,95 @@ export class PlayerComponent implements OnInit, OnDestroy {
   @Input() progressKey: string | null = null;
   @Output() overlaySave = new EventEmitter<void>();
 
+  @ViewChild('playerFrame') private playerFrame!: ElementRef<HTMLIFrameElement>;
+
+  /** Shown when the embed reports an error (best practice: handle errors gracefully). */
+  playerError: string | null = null;
+  playerReady = false;
+
   private static readonly STORAGE_KEY = 'playbackProgress';
   private static readonly THROTTLE_MS = 5_000;
+  private static readonly EMBED_ORIGIN = 'https://cinesrc.st';
   private messageHandler: ((e: MessageEvent) => void) | null = null;
   private lastSaveTime = 0;
+  private partySub: Subscription | null = null;
 
-  constructor(private readonly router: Router, private readonly zone: NgZone) {}
+  /** Prevents echo: when we apply a sync command from a peer, ignore the
+   *  resulting iframe event so we don't re-broadcast it back. */
+  private suppressNextEvent: string | null = null;
+
+  constructor(
+    private readonly router: Router,
+    private readonly zone: NgZone,
+    private readonly party: PartyService,
+  ) {}
 
   ngOnInit(): void {
+    /* ── Iframe postMessage listener ── */
     this.messageHandler = (e: MessageEvent) => {
+      /* Best practice: always verify origin */
+      if (e.origin !== PlayerComponent.EMBED_ORIGIN) return;
+
       const d = e.data;
-      if (!d || d.type !== 'cinesrc:timeupdate') return;
-      if (!this.progressKey) return;
-      const now = Date.now();
-      if (now - this.lastSaveTime < PlayerComponent.THROTTLE_MS) return;
-      this.lastSaveTime = now;
-      this.zone.runOutsideAngular(() => {
-        try {
-          const map: Record<string, number> = JSON.parse(localStorage.getItem(PlayerComponent.STORAGE_KEY) || '{}');
-          map[this.progressKey!] = Math.floor(d.currentTime);
-          localStorage.setItem(PlayerComponent.STORAGE_KEY, JSON.stringify(map));
-        } catch { /* ignore */ }
-      });
+      if (!d || typeof d.type !== 'string') return;
+
+      /* ── Best practice: handle player ready & errors gracefully ── */
+      if (d.type === 'cinesrc:ready') {
+        this.zone.run(() => (this.playerReady = true));
+        return;
+      }
+      if (d.type === 'cinesrc:error') {
+        this.zone.run(() => (this.playerError = d.error ?? 'Playback error'));
+        return;
+      }
+
+      /* ── Progress persistence (throttled) ── */
+      if (d.type === 'cinesrc:timeupdate' && this.progressKey) {
+        const now = Date.now();
+        if (now - this.lastSaveTime >= PlayerComponent.THROTTLE_MS) {
+          this.lastSaveTime = now;
+          this.zone.runOutsideAngular(() => {
+            try {
+              const map: Record<string, number> = JSON.parse(
+                localStorage.getItem(PlayerComponent.STORAGE_KEY) || '{}',
+              );
+              map[this.progressKey!] = Math.floor(d.currentTime);
+              localStorage.setItem(PlayerComponent.STORAGE_KEY, JSON.stringify(map));
+            } catch { /* ignore */ }
+          });
+        }
+      }
+
+      /* ── Party sync: host → broadcast relevant events to peers ── */
+      if (this.party && this.party.isHostNow) {
+        if (this.suppressNextEvent === d.type) {
+          this.suppressNextEvent = null;
+          return;
+        }
+
+        let sync: SyncEvent | null = null;
+        switch (d.type) {
+          case 'cinesrc:play':
+            sync = { action: 'play' };
+            break;
+          case 'cinesrc:pause':
+            sync = { action: 'pause' };
+            break;
+          case 'cinesrc:timeupdate':
+            // Host periodically shares current time so late joiners can sync
+            sync = { action: 'seek', currentTime: d.currentTime };
+            break;
+        }
+        if (sync) this.party.broadcastSync(sync);
+      }
     };
     window.addEventListener('message', this.messageHandler);
+
+    /* ── Party sync: guest → receive commands from host ── */
+    this.partySub = this.party.syncEvent$.subscribe((evt) => {
+      if (this.party.isHostNow) return; // host ignores its own broadcasts
+      this.applySyncEvent(evt);
+    });
   }
 
   ngOnDestroy(): void {
@@ -136,21 +244,56 @@ export class PlayerComponent implements OnInit, OnDestroy {
       window.removeEventListener('message', this.messageHandler);
       this.messageHandler = null;
     }
+    this.partySub?.unsubscribe();
   }
 
   /** Read saved playback seconds for the given key, or 0 */
   static getSavedTime(key: string): number {
     try {
-      const map: Record<string, number> = JSON.parse(localStorage.getItem(PlayerComponent.STORAGE_KEY) || '{}');
+      const map: Record<string, number> = JSON.parse(
+        localStorage.getItem(PlayerComponent.STORAGE_KEY) || '{}',
+      );
       return map[key] ?? 0;
-    } catch { return 0; }
+    } catch {
+      return 0;
+    }
   }
 
   goHome() {
+    this.party.leaveParty(); // clean up if in a party
     this.router.navigate(['/']);
   }
 
   onOverlayClick() {
     this.overlaySave.emit();
+  }
+
+  /* ── Private: send postMessage command to the CineSrc iframe ── */
+  private sendCommand(command: string, args: any[] = []): void {
+    const iframe = this.playerFrame?.nativeElement;
+    if (!iframe?.contentWindow) return;
+    iframe.contentWindow.postMessage(
+      { type: 'cinesrc:command', command, args },
+      PlayerComponent.EMBED_ORIGIN,
+    );
+  }
+
+  /** Apply an incoming sync event from the party host. */
+  private applySyncEvent(evt: SyncEvent): void {
+    switch (evt.action) {
+      case 'play':
+        this.suppressNextEvent = 'cinesrc:play';
+        this.sendCommand('play');
+        break;
+      case 'pause':
+        this.suppressNextEvent = 'cinesrc:pause';
+        this.sendCommand('pause');
+        break;
+      case 'seek':
+        if (evt.currentTime != null) {
+          this.sendCommand('seek', [evt.currentTime]);
+        }
+        break;
+    }
   }
 }

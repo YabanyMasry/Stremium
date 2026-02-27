@@ -2,6 +2,9 @@ import { Component, ViewChild, ElementRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { NgIf, NgFor, SlicePipe } from '@angular/common';
 import { TmdbService } from '../services/tmdb.service';
+import { PartyService } from '../services/party.service';
+import { PartyJoinDialogComponent } from '../party/party-join-dialog';
+import { PreviewSheetComponent, PreviewPlayEvent } from '../home/preview-sheet';
 
 interface SearchItem {
   id: number;
@@ -15,7 +18,7 @@ interface SearchItem {
 
 @Component({
   selector: 'app-header',
-  imports: [NgIf, NgFor, SlicePipe],
+  imports: [NgIf, NgFor, SlicePipe, PartyJoinDialogComponent, PreviewSheetComponent],
   template: `
     <header class="site-header">
       <div class="container">
@@ -34,6 +37,16 @@ interface SearchItem {
           <a [class.active]="isActive('/')" (click)="navigate('/')" tabindex="0">Home</a>
           <a [class.active]="isActive('/movies')" (click)="navigate('/movies')" tabindex="0">Movies</a>
           <a [class.active]="isActive('/series')" (click)="navigate('/series')" tabindex="0">Series</a>
+          <a class="party-link" [class.active-party]="party.inPartyNow" (click)="openPartyDialog()" tabindex="0" title="Join Watch Party">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            Party
+          </a>
         </nav>
 
         <div class="search" [class.full]="searchExpanded">
@@ -65,6 +78,16 @@ interface SearchItem {
         </div>
       </div>
     </header>
+
+    <app-party-join-dialog #partyDialog></app-party-join-dialog>
+
+    <app-preview-sheet
+      [open]="previewOpen"
+      [mediaType]="previewMediaType"
+      [mediaId]="previewMediaId"
+      (play)="onPreviewPlay($event)"
+      (closed)="previewOpen = false"
+    ></app-preview-sheet>
   `,
   styles: `
     .site-header {
@@ -73,7 +96,7 @@ interface SearchItem {
       left: 50%;
       transform: translateX(-50%);
       width: calc(100% - 40px);
-      max-width: 700px;
+      max-width: 750px;
       background: rgba(14,14,14,0.72);
       color: #fff;
       padding: 0.55rem 0.85rem;
@@ -90,7 +113,7 @@ interface SearchItem {
     .logo { display: flex; align-items: center; cursor: pointer; user-select: none; flex-shrink: 0; }
     .logo-img { height: 28px; width: auto; display: block; filter: brightness(0) invert(1); }
 
-    .nav-links { display: flex; gap: 0.15rem; align-items: center; flex-shrink: 0; transition: opacity 220ms ease, max-width 320ms cubic-bezier(.25,.8,.25,1), margin 320ms ease; overflow: hidden; max-width: 300px; }
+    .nav-links { display: flex; gap: 0.15rem; align-items: center; flex-shrink: 0; transition: opacity 220ms ease, max-width 320ms cubic-bezier(.25,.8,.25,1), margin 320ms ease; overflow: hidden; max-width: 420px; white-space: nowrap; }
     .nav-links.hidden { opacity: 0; max-width: 0; pointer-events: none; margin: 0; }
     .nav-links a {
       color: rgba(255,255,255,0.50);
@@ -106,6 +129,10 @@ interface SearchItem {
     }
     .nav-links a:hover { color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.06); }
     .nav-links a.active { color: #fff; background: rgba(255,255,255,0.10); }
+
+    .party-link { display: inline-flex; align-items: center; gap: 4px; }
+    .party-link svg { flex-shrink: 0; }
+    .party-link.active-party { color: rgba(229,9,20,0.95); background: rgba(229,9,20,0.12); }
 
     .search { position: relative; margin-left: auto; flex: 1; display: flex; align-items: center; transition: flex-grow 320ms cubic-bezier(.25,.8,.25,1); }
     .search input { padding-right: 2rem; }
@@ -156,6 +183,7 @@ interface SearchItem {
 })
 export class Header {
   @ViewChild('searchInput') searchInput!: ElementRef<HTMLInputElement>;
+  @ViewChild('partyDialog') partyDialog!: PartyJoinDialogComponent;
   query = '';
   private timer: any = null;
   searchResults: SearchItem[] = [];
@@ -163,7 +191,20 @@ export class Header {
   showResults = false;
   searchExpanded = false;
 
-  constructor(private readonly router: Router, private readonly tmdb: TmdbService) {}
+  // preview sheet state
+  previewOpen = false;
+  previewMediaType: 'movie' | 'tv' = 'movie';
+  previewMediaId: number | null = null;
+
+  constructor(
+    private readonly router: Router,
+    private readonly tmdb: TmdbService,
+    readonly party: PartyService,
+  ) {}
+
+  openPartyDialog(): void {
+    this.partyDialog?.show();
+  }
 
   goHome(): void {
     this.router.navigate(['/']);
@@ -237,10 +278,22 @@ export class Header {
     this.showResults = false;
     this.query = '';
     this.searchExpanded = false;
-    if (item.media_type === 'movie') {
-      this.router.navigate(['/movie', item.id]);
-    } else if (item.media_type === 'tv') {
-      this.router.navigate(['/show', item.id]);
+    this.previewMediaType = item.media_type === 'tv' ? 'tv' : 'movie';
+    this.previewMediaId = item.id;
+    this.previewOpen = true;
+  }
+
+  onPreviewPlay(event: PreviewPlayEvent) {
+    this.previewOpen = false;
+    if (event.media_type === 'movie') {
+      this.router.navigate(['/movie', event.id]);
+    } else {
+      this.router.navigate(['/show', event.id], {
+        queryParams: {
+          season: event.season ?? 1,
+          episode: event.episode ?? 1,
+        },
+      });
     }
   }
 }
