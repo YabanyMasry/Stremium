@@ -197,24 +197,33 @@ export class PartyService {
     let contentResolved = false;
 
     conn.on('data', (raw: unknown) => {
+      if (!this.isValidMessage(raw)) return;
       const msg = raw as PartyMessage;
-      if (!msg || !msg.kind) return;
 
       this.zone.run(() => {
         switch (msg.kind) {
-          case 'sync':
-            this._syncEvent.next(msg.payload as SyncEvent);
+          case 'sync': {
+            const p = msg.payload;
+            if (!p || typeof p !== 'object' || !['play', 'pause', 'seek'].includes(p.action)) return;
+            if (p.action === 'seek' && typeof p.currentTime !== 'number') return;
+            this._syncEvent.next(p as SyncEvent);
             break;
+          }
 
           case 'welcome':
-          case 'content':
-            const content = msg.payload as ContentInfo;
+          case 'content': {
+            const c = msg.payload;
+            if (!c || typeof c !== 'object') return;
+            if (!['movie', 'tv'].includes(c.contentType)) return;
+            if (typeof c.tmdbId !== 'number' || c.tmdbId < 1) return;
+            const content = c as ContentInfo;
             this._contentEvent.next(content);
             if (isGuest && resolveContent && !contentResolved) {
               contentResolved = true;
               resolveContent(content);
             }
             break;
+          }
         }
       });
     });
@@ -237,5 +246,11 @@ export class PartyService {
     this.connections = [];
     try { this.peer?.destroy(); } catch { /* ignore */ }
     this.peer = null;
+  }
+
+  private isValidMessage(data: unknown): data is PartyMessage {
+    if (!data || typeof data !== 'object') return false;
+    const msg = data as any;
+    return typeof msg.kind === 'string' && ['sync', 'content', 'welcome'].includes(msg.kind);
   }
 }

@@ -99,7 +99,8 @@ export class ShowComponent implements OnInit {
         const extra: Record<string, string> = {};
         if (savedTime > 0) extra['t'] = String(savedTime);
         const raw = this.vidsrc.getEmbedUrlByTmdbTv(s.id, this.selectedSeason, this.selectedEpisodeNumber, extra);
-        this.embedUrl = raw ? this.sanitizer.bypassSecurityTrustResourceUrl(raw) : null;
+        const safeRaw = raw && raw.startsWith('https://cinesrc.st/embed/') ? raw : null;
+        this.embedUrl = safeRaw ? this.sanitizer.bypassSecurityTrustResourceUrl(safeRaw) : null;
 
         // Register content with party service for watch-together
         this.party.currentContent = {

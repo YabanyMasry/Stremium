@@ -79,7 +79,8 @@ export class MovieComponent implements OnInit {
         if (savedTime > 0) extra['t'] = String(savedTime);
         // build embed url using the TMDB id (service returns string)
         const raw = this.vidsrc.getEmbedUrlByTmdb(m.id, extra);
-        this.embedUrl = raw ? this.sanitizer.bypassSecurityTrustResourceUrl(raw) : null;
+        const safeRaw = raw && raw.startsWith('https://cinesrc.st/embed/') ? raw : null;
+        this.embedUrl = safeRaw ? this.sanitizer.bypassSecurityTrustResourceUrl(safeRaw) : null;
 
         // Register content with party service for watch-together
         this.party.currentContent = { contentType: 'movie', tmdbId: m.id };

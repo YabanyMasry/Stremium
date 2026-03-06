@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 export interface TmdbTopRatedResponse {
@@ -102,12 +102,7 @@ export interface TmdbSeasonDetails {
   providedIn: 'root'
 })
 export class TmdbService {
-  private readonly base = 'https://api.themoviedb.org/3';
-  private readonly url = `${this.base}/movie/top_rated?language=en-US&page=1`;
-  private readonly headers = new HttpHeaders({
-    accept: 'application/json',
-    Authorization: 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIxMjJmYzc1OGZmMWIxMmUyOThmMWMwODgwYjVlOTdhMyIsIm5iZiI6MTc3MTEwMTUyOS4wNzQsInN1YiI6IjY5OTBkZDU5YjQzZDg0ZWI4MjFhZTk3ZiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.6EWzDRl7ZBQ0A3djssW1u7ggfO-9vSCK4qcY9cxU62s'
-  });
+  private readonly proxyBase = '/api/tmdb';
 
   /** Static TMDB genre-id → name map (movies + TV combined) */
   static readonly GENRE_MAP: Record<number, string> = {
@@ -125,78 +120,73 @@ export class TmdbService {
 
   constructor(private readonly http: HttpClient) {}
 
+  /** Build a proxy URL: /api/tmdb?path=/...&key=value */
+  private proxyUrl(path: string, params: Record<string, string | number> = {}): string {
+    const qs = new URLSearchParams({ path, ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) });
+    return `${this.proxyBase}?${qs.toString()}`;
+  }
+
   getTopRatedMovies(page: number = 1): Observable<TmdbTopRatedResponse> {
-    const url = `${this.base}/movie/top_rated?language=en-US&page=${page}`;
-    return this.http.get<TmdbTopRatedResponse>(url, { headers: this.headers });
+    return this.http.get<TmdbTopRatedResponse>(this.proxyUrl('/movie/top_rated', { language: 'en-US', page }));
   }
 
   getTopRatedTvShows(page: number = 1): Observable<TmdbTopRatedTvResponse> {
-    const url = `${this.base}/tv/top_rated?language=en-US&page=${page}`;
-    return this.http.get<TmdbTopRatedTvResponse>(url, { headers: this.headers });
+    return this.http.get<TmdbTopRatedTvResponse>(this.proxyUrl('/tv/top_rated', { language: 'en-US', page }));
   }
 
   searchMulti(query: string, page: number = 1): Observable<any> {
-    const q = encodeURIComponent(query);
-    const url = `${this.base}/search/multi?query=${q}&include_adult=true&language=en-US&page=${page}`;
-    return this.http.get<any>(url, { headers: this.headers });
+    return this.http.get<any>(this.proxyUrl('/search/multi', { query, include_adult: 'true', language: 'en-US', page }));
   }
 
   getSeasonDetails(seriesId: number, seasonNumber: number): Observable<TmdbSeasonDetails> {
-    const url = `${this.base}/tv/${seriesId}/season/${seasonNumber}?language=en-US`;
-    return this.http.get<TmdbSeasonDetails>(url, { headers: this.headers });
+    return this.http.get<TmdbSeasonDetails>(this.proxyUrl(`/tv/${seriesId}/season/${seasonNumber}`, { language: 'en-US' }));
   }
 
   getPopularMovies(page: number = 1): Observable<TmdbTopRatedResponse> {
-    const url = `${this.base}/movie/popular?language=en-US&page=${page}`;
-    return this.http.get<TmdbTopRatedResponse>(url, { headers: this.headers });
+    return this.http.get<TmdbTopRatedResponse>(this.proxyUrl('/movie/popular', { language: 'en-US', page }));
   }
 
   getPopularTvShows(page: number = 1): Observable<TmdbTopRatedTvResponse> {
-    const url = `${this.base}/tv/popular?language=en-US&page=${page}`;
-    return this.http.get<TmdbTopRatedTvResponse>(url, { headers: this.headers });
+    return this.http.get<TmdbTopRatedTvResponse>(this.proxyUrl('/tv/popular', { language: 'en-US', page }));
   }
 
   getMovieDetails(tmdbId: number): Observable<TmdbMovieDetails> {
-    const url = `${this.base}/movie/${tmdbId}?language=en-US`;
-    return this.http.get<TmdbMovieDetails>(url, { headers: this.headers });
+    return this.http.get<TmdbMovieDetails>(this.proxyUrl(`/movie/${tmdbId}`, { language: 'en-US' }));
   }
 
   getMovieImages(tmdbId: number): Observable<any> {
-    const url = `${this.base}/movie/${tmdbId}/images?include_image_language=en-US`;
-    return this.http.get<any>(url, { headers: this.headers });
+    return this.http.get<any>(this.proxyUrl(`/movie/${tmdbId}/images`, { include_image_language: 'en-US' }));
   }
 
   getTvDetails(tvId: number): Observable<TmdbTvDetails> {
-    const url = `${this.base}/tv/${tvId}?language=en-US`;
-    return this.http.get<TmdbTvDetails>(url, { headers: this.headers });
+    return this.http.get<TmdbTvDetails>(this.proxyUrl(`/tv/${tvId}`, { language: 'en-US' }));
   }
 
   getTvImages(tvId: number): Observable<any> {
-    const url = `${this.base}/tv/${tvId}/images?include_image_language=en-US`;
-    return this.http.get<any>(url, { headers: this.headers });
+    return this.http.get<any>(this.proxyUrl(`/tv/${tvId}/images`, { include_image_language: 'en-US' }));
   }
 
   // ── Genre lists ──
 
   getMovieGenres(): Observable<{ genres: { id: number; name: string }[] }> {
-    const url = `${this.base}/genre/movie/list?language=en-US`;
-    return this.http.get<{ genres: { id: number; name: string }[] }>(url, { headers: this.headers });
+    return this.http.get<{ genres: { id: number; name: string }[] }>(this.proxyUrl('/genre/movie/list', { language: 'en-US' }));
   }
 
   getTvGenres(): Observable<{ genres: { id: number; name: string }[] }> {
-    const url = `${this.base}/genre/tv/list?language=en-US`;
-    return this.http.get<{ genres: { id: number; name: string }[] }>(url, { headers: this.headers });
+    return this.http.get<{ genres: { id: number; name: string }[] }>(this.proxyUrl('/genre/tv/list', { language: 'en-US' }));
   }
 
   // ── Discover by genre ──
 
   discoverMoviesByGenre(genreId: number, page = 1): Observable<TmdbTopRatedResponse> {
-    const url = `${this.base}/discover/movie?language=en-US&sort_by=vote_average.desc&with_genres=${genreId}&vote_count.gte=50&page=${page}`;
-    return this.http.get<TmdbTopRatedResponse>(url, { headers: this.headers });
+    return this.http.get<TmdbTopRatedResponse>(this.proxyUrl('/discover/movie', {
+      language: 'en-US', sort_by: 'vote_average.desc', with_genres: genreId, 'vote_count.gte': 50, page,
+    }));
   }
 
   discoverTvByGenre(genreId: number, page = 1): Observable<TmdbTopRatedTvResponse> {
-    const url = `${this.base}/discover/tv?language=en-US&sort_by=vote_average.desc&with_genres=${genreId}&vote_count.gte=50&page=${page}`;
-    return this.http.get<TmdbTopRatedTvResponse>(url, { headers: this.headers });
+    return this.http.get<TmdbTopRatedTvResponse>(this.proxyUrl('/discover/tv', {
+      language: 'en-US', sort_by: 'vote_average.desc', with_genres: genreId, 'vote_count.gte': 50, page,
+    }));
   }
 }
