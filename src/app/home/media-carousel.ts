@@ -222,6 +222,33 @@ export interface MediaRowItem {
       background: rgba(255,255,255,0.12);
       color: rgba(0,0,0,0.9);
     }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      .row-container { padding: 0 4vw; }
+      .row-container::before { left: 4vw; }
+      .row-container::after  { right: 4vw; }
+      .media-row { gap: 0.5rem; }
+      .media-card { flex: 0 0 150px; width: 150px; }
+      .media-poster { height: 225px; }
+      .media-title { font-size: 0.9rem; }
+      .media-meta { font-size: 0.75rem; }
+      .scroll-btn { width: 36px; height: 36px; font-size: 1rem; }
+      .scroll-btn.left  { left: 3vw; }
+      .scroll-btn.right { right: 3vw; }
+    }
+
+    @media (max-width: 480px) {
+      .row-container { padding: 0 3vw; }
+      .row-container::before { left: 3vw; }
+      .row-container::after  { right: 3vw; }
+      .media-row { gap: 0.4rem; }
+      .media-card { flex: 0 0 130px; width: 130px; }
+      .media-poster { height: 195px; }
+      .media-title { font-size: 0.82rem; }
+      .media-meta { font-size: 0.7rem; gap: 0.3rem; }
+      .scroll-btn { display: none; }
+    }
   `],
 })
 export class MediaCarouselComponent implements AfterViewInit {

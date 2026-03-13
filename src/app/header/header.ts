@@ -179,6 +179,39 @@ interface SearchItem {
     .result .title { font-weight: 600; color: #fff; }
     .result .sub { color: rgba(255,255,255,0.45); font-size: 0.82rem; }
     .empty { padding: 0.65rem; color: rgba(255,255,255,0.4); font-size: 0.88rem; }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      .site-header {
+        top: 8px;
+        width: calc(100% - 20px);
+        padding: 0.4rem 0.6rem;
+        border-radius: 18px;
+      }
+      .container { gap: 0.5rem; }
+      .logo-img { height: 22px; }
+      .nav-links a { font-size: 0.82rem; padding: 0.25rem 0.5rem; }
+      .party-link svg { width: 14px; height: 14px; }
+      .search input { font-size: 0.82rem; padding: 0.35rem 0.6rem; }
+      .results { max-height: 60vh; }
+      .result img { width: 36px; height: 54px; }
+      .result .meta { font-size: 0.82rem; }
+    }
+
+    @media (max-width: 480px) {
+      .site-header {
+        top: 6px;
+        width: calc(100% - 22px);
+        padding: 0.35rem 0.5rem;
+        border-radius: 16px;
+      }
+      .container { gap: 0.35rem; }
+      .logo-img { height: 18px; }
+      .nav-links { gap: 0; }
+      .nav-links a { font-size: 0.72rem; padding: 0.2rem 0.4rem; }
+      .party-link svg { width: 12px; height: 12px; }
+      .search input { font-size: 0.78rem; padding: 0.3rem 0.5rem; }
+    }
   `,
 })
 export class Header {

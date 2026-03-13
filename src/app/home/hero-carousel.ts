@@ -289,6 +289,81 @@ export interface HeroSlide {
       .dot:hover:not(.active) {
         background: rgba(255, 255, 255, 0.5);
       }
+
+      /* ── Mobile ── */
+      @media (max-width: 768px) {
+        .hero {
+          aspect-ratio: 16 / 9;
+          margin-bottom: 0.25rem;
+        }
+        .slide-content {
+          left: 5vw;
+          bottom: 14%;
+          max-width: 70%;
+          gap: 0.35rem;
+        }
+        .slide-logo {
+          max-width: 180px;
+          max-height: 10vw;
+        }
+        .slide-overview {
+          display: none;
+        }
+        .pill {
+          font-size: 0.72rem;
+          padding: 3px 8px;
+        }
+        .pill.type { font-size: 0.68rem; }
+        .pill.genre { font-size: 0.68rem; }
+        .slide-play {
+          padding: 0.4rem 1.1rem;
+          font-size: 0.82rem;
+        }
+        .arrow {
+          width: 34px;
+          height: 34px;
+          font-size: 1.1rem;
+          opacity: 1;
+        }
+        .dots { bottom: 0.5rem; gap: 4px; }
+        .dot { width: 5px; height: 5px; min-width: 0; min-height: 0; }
+        .dot.active { width: 14px; }
+      }
+
+      @media (max-width: 480px) {
+        .hero {
+          aspect-ratio: 4 / 3;
+        }
+        .slide-content {
+          left: 4vw;
+          bottom: 12%;
+          max-width: 85%;
+          gap: 0.3rem;
+        }
+        .slide-logo {
+          max-width: 140px;
+          max-height: 14vw;
+        }
+        .slide-meta { gap: 0.25rem; }
+        .pill {
+          font-size: 0.65rem;
+          padding: 2px 6px;
+        }
+        .slide-play {
+          padding: 0.35rem 0.9rem;
+          font-size: 0.78rem;
+        }
+        .arrow {
+          width: 28px;
+          height: 28px;
+          font-size: 0.95rem;
+        }
+        .arrow.left { left: 0.5rem; }
+        .arrow.right { right: 0.5rem; }
+        .dots { bottom: 0.35rem; gap: 3px; }
+        .dot { width: 4px; height: 4px; min-width: 0; min-height: 0; }
+        .dot.active { width: 12px; }
+      }
     `,
   ],
 })

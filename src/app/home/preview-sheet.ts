@@ -116,6 +116,29 @@ export interface PreviewPlayEvent {
     .preview-actions button:focus { outline: none; box-shadow: 0 0 0 4px rgba(255,255,255,0.04); }
     .preview-overview { color: rgba(194,194,194,0.92); font-family: 'roboto'; }
 
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      .preview-sheet {
+        left: 5vw; right: 5vw; top: 6vh;
+        border-radius: 10px 10px 0 0;
+      }
+      .banner-logo { width: 50%; max-width: 50%; }
+      .preview-body { padding: 0.75rem 1rem 1rem; }
+      .meta-pill { font-size: 0.78rem; padding: 4px 8px; }
+    }
+
+    @media (max-width: 480px) {
+      .preview-sheet {
+        left: 0; right: 0; top: 5vh;
+        border-radius: 10px 10px 0 0;
+      }
+      .banner-logo { width: 60%; max-width: 60%; left: 0.75rem; bottom: 0.75rem; }
+      .banner-logo img { max-height: 20vh; }
+      .preview-body { padding: 0.5rem 0.75rem 0.75rem; }
+      .preview-actions button { font-size: 0.85rem; padding: 6px 10px; }
+      .meta-pill { font-size: 0.72rem; padding: 3px 6px; }
+    }
+
     .preview-loader {
       position: absolute; inset: 0; z-index: 10;
       display: flex; align-items: center; justify-content: center;

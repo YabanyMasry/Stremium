@@ -84,6 +84,18 @@ import { Router } from '@angular/router';
     h2 { color: #ffffff; margin: 0 0 0.75rem 0; font-family: 'Doto', 'Roboto', system-ui, sans-serif; font-size: 1.8rem; font-weight: 800; padding: 0 8vw; box-sizing: border-box; }
     .loading { color: #6b7280; margin: 1rem 0; padding: 0 8vw; box-sizing: border-box; }
 
+    @media (max-width: 768px) {
+      .media-section { padding: 0.75rem 0.5rem; }
+      h2 { font-size: 1.3rem; padding: 0 4vw; margin-bottom: 0.5rem; }
+      .loading { padding: 0 4vw; }
+    }
+
+    @media (max-width: 480px) {
+      .media-section { padding: 0.5rem 0.25rem; }
+      h2 { font-size: 1.15rem; padding: 0 3vw; margin-bottom: 0.4rem; }
+      .loading { padding: 0 3vw; }
+    }
+
     /* Loading screen */
     .loading-screen {
       position: fixed; inset: 0; z-index: 2000;

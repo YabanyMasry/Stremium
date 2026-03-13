@@ -182,6 +182,31 @@ import { TmdbSeasonDetails, TmdbEpisode } from '../services/tmdb.service';
         transition: background 160ms ease;
       }
       .load-more:hover { background: rgba(255,255,255,0.10); color: #fff; }
+
+      /* ── Mobile ── */
+      @media (max-width: 768px) {
+        .select-box { padding: 0.5rem 0.4rem; flex-wrap: wrap; gap: 0.4rem; }
+        .select-left { font-size: 0.85rem; }
+        .combo-trigger { min-width: 130px; padding: 0.4rem 0.6rem; font-size: 0.85rem; }
+        .combo-list { width: 180px; }
+        .ep-still { flex: 0 0 100px; width: 100px; height: 56px; }
+        .episode { padding: 0.6rem 0.5rem; gap: 0.6rem; }
+        .ep-title { font-size: 0.9rem; }
+        .ep-sub { font-size: 0.78rem; }
+        .ep-overview { font-size: 0.75rem; -webkit-line-clamp: 1; }
+      }
+
+      @media (max-width: 480px) {
+        .select-box { flex-direction: column; align-items: flex-start; gap: 0.3rem; padding: 0.4rem; }
+        .combo-trigger { min-width: 100%; }
+        .combo-list { width: 100%; left: 0; right: 0; }
+        .ep-still { flex: 0 0 80px; width: 80px; height: 45px; }
+        .episode { padding: 0.5rem 0.4rem; gap: 0.5rem; }
+        .ep-title { font-size: 0.85rem; }
+        .ep-sub { font-size: 0.72rem; }
+        .ep-overview { display: none; }
+        .ep-num-badge { font-size: 0.6rem; padding: 1px 4px; }
+      }
     `,
   ],
 })

@@ -15,3 +15,9 @@
   from = "/api/tmdb"
   to = "/.netlify/functions/tmdb-proxy"
   status = 200
+
+# SPA fallback – must be last
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

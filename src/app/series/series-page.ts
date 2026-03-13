@@ -67,6 +67,17 @@ import { Router } from '@angular/router';
     h1 { color: #fff; font-family: 'Doto', 'Roboto', system-ui, sans-serif; font-size: 2.2rem; font-weight: 800; padding: 0 8vw; margin: 0 0 0.5rem; }
     h2 { color: #fff; font-family: 'Doto', 'Roboto', system-ui, sans-serif; font-size: 1.8rem; font-weight: 800; padding: 0 8vw; margin: 1.25rem 0 0.75rem; }
 
+    @media (max-width: 768px) {
+      .page { padding: 0.75rem 0.5rem; }
+      h1 { font-size: 1.6rem; padding: 0 4vw; }
+      h2 { font-size: 1.3rem; padding: 0 4vw; margin: 0.75rem 0 0.5rem; }
+    }
+    @media (max-width: 480px) {
+      .page { padding: 0.5rem 0.25rem; }
+      h1 { font-size: 1.4rem; padding: 0 3vw; }
+      h2 { font-size: 1.15rem; padding: 0 3vw; margin: 0.5rem 0 0.4rem; }
+    }
+
     /* Loading screen */
     .loading-screen {
       position: fixed; inset: 0; z-index: 2000;
