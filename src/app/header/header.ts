@@ -14,6 +14,22 @@ interface SearchItem {
   poster_path?: string | null;
   release_date?: string;
   first_air_date?: string;
+  adult?: boolean;
+  genre_ids?: number[];
+  original_language?: string;
+}
+
+/** TMDB genre id 10749 = Romance; we don't block it, but combined with adult=true or JAV-style heuristics it's a strong NSFW signal. */
+const ADULT_GENRE_IDS = new Set<number>([
+  // No "adult" genre id is exposed by TMDB to non-adult accounts; this hook
+  // is here so we can extend the heuristic without re-shaping callers.
+]);
+
+/** Heuristic NSFW filter — TMDB's `adult` flag is the primary signal. */
+function isAdult(item: SearchItem): boolean {
+  if (item.adult === true) return true;
+  if (item.genre_ids?.some((id) => ADULT_GENRE_IDS.has(id))) return true;
+  return false;
 }
 
 @Component({
@@ -169,16 +185,16 @@ interface SearchItem {
       box-shadow: 0 12px 36px rgba(0,0,0,0.55);
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 12px;
-      max-height: 380px; overflow: auto; z-index: 1200;
+      max-height: 420px; overflow: auto; z-index: 1200;
     }
-    .result { display: flex; gap: 0.65rem; padding: 0.55rem 0.65rem; align-items: center; cursor: pointer; transition: background 120ms ease; }
+    .result { display: flex; gap: 0.8rem; padding: 0.7rem 0.8rem; align-items: center; cursor: pointer; transition: background 120ms ease; }
     .result + .result { border-top: 1px solid rgba(255,255,255,0.06); }
     .result:hover { background: rgba(255,255,255,0.06); }
-    .result img { width: 44px; height: 66px; object-fit: cover; border-radius: 6px; }
-    .result .meta { font-size: 0.88rem; }
-    .result .title { font-weight: 600; color: #fff; }
-    .result .sub { color: rgba(255,255,255,0.45); font-size: 0.82rem; }
-    .empty { padding: 0.65rem; color: rgba(255,255,255,0.4); font-size: 0.88rem; }
+    .result img { width: 50px; height: 75px; object-fit: cover; border-radius: 6px; }
+    .result .meta { font-size: 0.95rem; line-height: 1.3; }
+    .result .title { font-weight: 700; color: #fff; letter-spacing: 0.1px; }
+    .result .sub { color: rgba(255,255,255,0.62); font-size: 0.82rem; margin-top: 3px; text-transform: capitalize; }
+    .empty { padding: 0.8rem; color: rgba(255,255,255,0.55); font-size: 0.92rem; }
 
     /* ── Mobile ── */
     @media (max-width: 768px) {
@@ -194,8 +210,10 @@ interface SearchItem {
       .party-link svg { width: 14px; height: 14px; }
       .search input { font-size: 0.82rem; padding: 0.35rem 0.6rem; }
       .results { max-height: 60vh; }
-      .result img { width: 36px; height: 54px; }
-      .result .meta { font-size: 0.82rem; }
+      .result { padding: 0.6rem 0.65rem; gap: 0.65rem; }
+      .result img { width: 42px; height: 63px; }
+      .result .meta { font-size: 0.9rem; }
+      .result .sub { font-size: 0.78rem; }
     }
 
     @media (max-width: 480px) {
@@ -285,8 +303,8 @@ export class Header {
     this.tmdb.searchMulti(q).subscribe({
       next: (res) => {
         const items = (res.results || []) as SearchItem[];
-        // exclude person media type
-        this.searchResults = items.filter((i) => i.media_type !== 'person');
+        // exclude people and adult/NSFW results
+        this.searchResults = items.filter((i) => i.media_type !== 'person' && !isAdult(i));
         this.isSearching = false;
         this.showResults = true;
       },

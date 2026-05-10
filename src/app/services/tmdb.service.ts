@@ -135,7 +135,7 @@ export class TmdbService {
   }
 
   searchMulti(query: string, page: number = 1): Observable<any> {
-    return this.http.get<any>(this.proxyUrl('/search/multi', { query, include_adult: 'true', language: 'en-US', page }));
+    return this.http.get<any>(this.proxyUrl('/search/multi', { query, include_adult: 'false', language: 'en-US', page }));
   }
 
   getSeasonDetails(seriesId: number, seasonNumber: number): Observable<TmdbSeasonDetails> {

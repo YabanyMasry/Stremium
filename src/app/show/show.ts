@@ -1,11 +1,14 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { NgIf } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { TmdbService, TmdbTvDetails } from '../services/tmdb.service';
 import { VidsrcService } from '../services/vidsrc.service';
+import { VidkingService } from '../services/vidking.service';
+import { ProviderService, StreamProvider } from '../services/provider.service';
 import { PlayerComponent } from '../player/player';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { PartyService } from '../services/party.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-show',
@@ -19,7 +22,11 @@ import { PartyService } from '../services/party.service';
         [title]="'Player for ' + show.name"
         [saved]="savedToContinue"
         [progressKey]="progressKey"
+        [currentSeason]="selectedSeason"
+        [currentEpisode]="selectedEpisodeNumber"
         (overlaySave)="saveToContinue()"
+        (providerChanged)="onProviderChanged($event)"
+        (episodeChanged)="onEpisodeChanged($event)"
       ></app-player>
 
       <p *ngIf="!embedUrl" class="no-embed">No embed available for this title.</p>
@@ -41,7 +48,7 @@ import { PartyService } from '../services/party.service';
     .no-embed { color:#9ca3af; position: absolute; z-index: 40; font-size: 1rem; }
   `],
 })
-export class ShowComponent implements OnInit {
+export class ShowComponent implements OnInit, OnDestroy {
   show: TmdbTvDetails | null = null;
   embedUrl: SafeResourceUrl | null = null;
   selectedSeason = 1;
@@ -50,11 +57,14 @@ export class ShowComponent implements OnInit {
 
   private readonly storageKeyShows = 'continueShows';
   savedToContinue = false;
+  private providerSub: Subscription | null = null;
 
   constructor(
     private readonly route: ActivatedRoute,
     private readonly tmdb: TmdbService,
     private readonly vidsrc: VidsrcService,
+    private readonly vidking: VidkingService,
+    private readonly providerSvc: ProviderService,
     private readonly sanitizer: DomSanitizer,
     private readonly party: PartyService,
   ) {}
@@ -95,12 +105,7 @@ export class ShowComponent implements OnInit {
         if (qEpisode) this.selectedEpisodeNumber = qEpisode;
 
         this.progressKey = `tv_${s.id}_${this.selectedSeason}_${this.selectedEpisodeNumber}`;
-        const savedTime = PlayerComponent.getSavedTime(this.progressKey);
-        const extra: Record<string, string> = {};
-        if (savedTime > 0) extra['t'] = String(savedTime);
-        const raw = this.vidsrc.getEmbedUrlByTmdbTv(s.id, this.selectedSeason, this.selectedEpisodeNumber, extra);
-        const safeRaw = raw && raw.startsWith('https://cinesrc.st/embed/') ? raw : null;
-        this.embedUrl = safeRaw ? this.sanitizer.bypassSecurityTrustResourceUrl(safeRaw) : null;
+        this.rebuildEmbedUrl();
 
         // Register content with party service for watch-together
         this.party.currentContent = {
@@ -113,9 +118,44 @@ export class ShowComponent implements OnInit {
       },
       error: (err) => console.error(err),
     });
+
+    // Rebuild URL when the user switches provider
+    this.providerSub = this.providerSvc.provider$.subscribe(() => this.rebuildEmbedUrl());
   }
 
-  saveToContinue(): void {
+  ngOnDestroy(): void {
+    this.providerSub?.unsubscribe();
+  }
+
+  onProviderChanged(_p: StreamProvider): void {
+    // ProviderService is the source of truth; the subscription handles the rebuild.
+  }
+
+  /**
+   * The embedded player switched episodes on its own (auto-next or in-player
+   * episode picker). Update state, progressKey, party content, and persist
+   * to continueShows so refreshing resumes on the new episode.
+   * We deliberately DO NOT rebuild the iframe URL — the embed is already
+   * playing the new episode; reloading would interrupt playback.
+   */
+  onEpisodeChanged(evt: { season: number; episode: number }): void {
+    if (!this.show) return;
+    this.selectedSeason = evt.season;
+    this.selectedEpisodeNumber = evt.episode;
+    this.progressKey = `tv_${this.show.id}_${evt.season}_${evt.episode}`;
+    this.persistContinueShows();
+
+    // Update party content so guests stay in sync on which episode the host moved to.
+    this.party.currentContent = {
+      contentType: 'tv',
+      tmdbId: this.show.id,
+      season: evt.season,
+      episode: evt.episode,
+    };
+    this.party.broadcastContent();
+  }
+
+  private persistContinueShows(): void {
     const id = this.show?.id;
     if (!id) return;
     let entries: Array<{ id: number; season?: number | null; episode?: number | null }> = [];
@@ -125,15 +165,47 @@ export class ShowComponent implements OnInit {
       entries = [];
     }
     const existing = entries.find((e) => e.id === id);
-    const progress = { id, season: this.selectedSeason, episode: this.selectedEpisodeNumber };
     if (existing) {
-      existing.season = progress.season;
-      existing.episode = progress.episode;
+      existing.season = this.selectedSeason;
+      existing.episode = this.selectedEpisodeNumber;
     } else {
-      entries.push(progress);
+      entries.push({ id, season: this.selectedSeason, episode: this.selectedEpisodeNumber });
     }
     localStorage.setItem(this.storageKeyShows, JSON.stringify(entries));
     this.savedToContinue = true;
-    window.dispatchEvent(new CustomEvent('continueShowsUpdated', { detail: { id, season: this.selectedSeason, episode: this.selectedEpisodeNumber } }));
+    window.dispatchEvent(new CustomEvent('continueShowsUpdated', {
+      detail: { id, season: this.selectedSeason, episode: this.selectedEpisodeNumber },
+    }));
+  }
+
+  saveToContinue(): void {
+    this.persistContinueShows();
+  }
+
+  private rebuildEmbedUrl(): void {
+    if (!this.show || !this.progressKey) return;
+    const savedTime = PlayerComponent.getSavedTime(this.progressKey);
+    const provider = this.providerSvc.current;
+    let raw: string | null = null;
+
+    if (provider === 'vidking') {
+      const extra: Record<string, string> = {};
+      if (savedTime > 0) extra['progress'] = String(savedTime);
+      raw = this.vidking.getEmbedUrlByTmdbTv(this.show.id, this.selectedSeason, this.selectedEpisodeNumber, extra);
+    } else {
+      const extra: Record<string, string> = {};
+      if (savedTime > 0) extra['t'] = String(savedTime);
+      raw = this.vidsrc.getEmbedUrlByTmdbTv(this.show.id, this.selectedSeason, this.selectedEpisodeNumber, extra);
+    }
+
+    const safeRaw = this.isAllowed(raw, provider) ? raw : null;
+    this.embedUrl = safeRaw ? this.sanitizer.bypassSecurityTrustResourceUrl(safeRaw) : null;
+  }
+
+  private isAllowed(url: string | null, provider: StreamProvider): boolean {
+    if (!url) return false;
+    if (provider === 'cinesrc') return url.startsWith('https://cinesrc.st/embed/');
+    if (provider === 'vidking') return url.startsWith('https://www.vidking.net/embed/');
+    return false;
   }
 }

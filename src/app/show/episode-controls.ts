@@ -21,8 +21,6 @@ import { TmdbSeasonDetails, TmdbEpisode } from '../services/tmdb.service';
               <ul *ngIf="seasonOpen" class="combo-list" role="listbox">
                 <li *ngFor="let s of displayedSeasons" role="option" class="combo-item" [class.selected]="(s.season_number || 0) === selectedSeason" (click)="onSelectSeason(s.season_number || 0)">{{ (s.season_number || 0) >=1 ? ('Season ' + (s.season_number || 0)) : (s.name || 'Specials') }}</li>
               </ul>
-
-              <button *ngIf="!showAllSeasons && allSeasonsLength > seasonsToShow" class="load-more" (click)="toggleLoadMoreSeasons.emit()">Load more</button>
             </div>
           </div>
         </div>
@@ -168,20 +166,6 @@ import { TmdbSeasonDetails, TmdbEpisode } from '../services/tmdb.service';
         box-shadow: 0 8px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.12);
       }
       .pill-btn:active { transform: translateY(0); }
-
-      .load-more {
-        background: rgba(255,255,255,0.06);
-        backdrop-filter: blur(8px);
-        color: rgba(255,255,255,0.7);
-        border: 1px solid rgba(255,255,255,0.08);
-        padding: 0.35rem 0.8rem;
-        border-radius: 8px;
-        font-weight: 600;
-        font-size: 0.82rem;
-        cursor: pointer;
-        transition: background 160ms ease;
-      }
-      .load-more:hover { background: rgba(255,255,255,0.10); color: #fff; }
 
       /* ── Mobile ── */
       @media (max-width: 768px) {

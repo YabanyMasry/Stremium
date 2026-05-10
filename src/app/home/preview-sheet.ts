@@ -248,7 +248,8 @@ export class PreviewSheetComponent implements OnChanges {
           return aa - bb;
         });
         this.pvAllSeasons = seasons;
-        this.pvDisplayedSeasons = seasons.slice(0, this.pvSeasonsToShow);
+        this.pvDisplayedSeasons = seasons.slice();
+        this.pvShowAllSeasons = true;
         const prefer = seasons.find((ss: any) => ss.season_number && ss.season_number >= 1) || seasons[0];
         this.pvSelectedSeason = prefer?.season_number || 1;
         this.pvSavedEpisode = null;

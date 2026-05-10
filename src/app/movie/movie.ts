@@ -1,11 +1,14 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { NgIf } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { TmdbService, TmdbMovieDetails } from '../services/tmdb.service';
 import { VidsrcService } from '../services/vidsrc.service';
+import { VidkingService } from '../services/vidking.service';
+import { ProviderService, StreamProvider } from '../services/provider.service';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { PlayerComponent } from '../player/player';
 import { PartyService } from '../services/party.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-movie',
@@ -20,6 +23,7 @@ import { PartyService } from '../services/party.service';
         [saved]="savedToContinue"
         [progressKey]="progressKey"
         (overlaySave)="saveToContinue()"
+        (providerChanged)="onProviderChanged($event)"
       ></app-player>
 
       <p *ngIf="!embedUrl" class="no-embed">No embed available for this title.</p>
@@ -49,18 +53,21 @@ import { PartyService } from '../services/party.service';
     `,
   ],
 })
-export class MovieComponent implements OnInit {
+export class MovieComponent implements OnInit, OnDestroy {
   movie: TmdbMovieDetails | null = null;
   embedUrl: SafeResourceUrl | null = null;
   progressKey: string | null = null;
 
   private readonly storageKey = 'continueMovies';
   savedToContinue = false;
+  private providerSub: Subscription | null = null;
 
   constructor(
     private readonly route: ActivatedRoute,
     private readonly tmdb: TmdbService,
     private readonly vidsrc: VidsrcService,
+    private readonly vidking: VidkingService,
+    private readonly providerSvc: ProviderService,
     private readonly sanitizer: DomSanitizer,
     private readonly party: PartyService,
   ) {}
@@ -72,24 +79,26 @@ export class MovieComponent implements OnInit {
     this.tmdb.getMovieDetails(id).subscribe({
       next: (m) => {
         this.movie = m;
-        // build progress key and check for saved time
         this.progressKey = `movie_${m.id}`;
-        const savedTime = PlayerComponent.getSavedTime(this.progressKey);
-        const extra: Record<string, string> = {};
-        if (savedTime > 0) extra['t'] = String(savedTime);
-        // build embed url using the TMDB id (service returns string)
-        const raw = this.vidsrc.getEmbedUrlByTmdb(m.id, extra);
-        const safeRaw = raw && raw.startsWith('https://cinesrc.st/embed/') ? raw : null;
-        this.embedUrl = safeRaw ? this.sanitizer.bypassSecurityTrustResourceUrl(safeRaw) : null;
+        this.rebuildEmbedUrl();
 
         // Register content with party service for watch-together
         this.party.currentContent = { contentType: 'movie', tmdbId: m.id };
         this.party.broadcastContent();
       },
-      error: (err) => {
-        console.error(err);
-      }
+      error: (err) => console.error(err),
     });
+
+    // Rebuild URL when the user switches provider
+    this.providerSub = this.providerSvc.provider$.subscribe(() => this.rebuildEmbedUrl());
+  }
+
+  ngOnDestroy(): void {
+    this.providerSub?.unsubscribe();
+  }
+
+  onProviderChanged(_p: StreamProvider): void {
+    // ProviderService is the source of truth; the subscription above handles the rebuild.
   }
 
   saveToContinue(): void {
@@ -105,10 +114,34 @@ export class MovieComponent implements OnInit {
       ids.push(id);
       localStorage.setItem(this.storageKey, JSON.stringify(ids));
     }
-    // mark saved so overlay no longer shows
     this.savedToContinue = true;
-    console.log('savedToContinue:', id);
-    // dispatch a simple event so other components can react if needed
     window.dispatchEvent(new CustomEvent('continueMoviesUpdated', { detail: { id } }));
+  }
+
+  private rebuildEmbedUrl(): void {
+    if (!this.movie || !this.progressKey) return;
+    const savedTime = PlayerComponent.getSavedTime(this.progressKey);
+    const provider = this.providerSvc.current;
+    let raw: string | null = null;
+
+    if (provider === 'vidking') {
+      const extra: Record<string, string> = {};
+      if (savedTime > 0) extra['progress'] = String(savedTime);
+      raw = this.vidking.getEmbedUrlByTmdb(this.movie.id, extra);
+    } else {
+      const extra: Record<string, string> = {};
+      if (savedTime > 0) extra['t'] = String(savedTime);
+      raw = this.vidsrc.getEmbedUrlByTmdb(this.movie.id, extra);
+    }
+
+    const safeRaw = this.isAllowed(raw, provider) ? raw : null;
+    this.embedUrl = safeRaw ? this.sanitizer.bypassSecurityTrustResourceUrl(safeRaw) : null;
+  }
+
+  private isAllowed(url: string | null, provider: StreamProvider): boolean {
+    if (!url) return false;
+    if (provider === 'cinesrc') return url.startsWith('https://cinesrc.st/embed/');
+    if (provider === 'vidking') return url.startsWith('https://www.vidking.net/embed/');
+    return false;
   }
 }
